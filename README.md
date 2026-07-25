@@ -1,10 +1,15 @@
 # Friar
 
-**Friar** (`src/Friar.sol`) is a Uniswap v4 dynamic-fee hook for Robinhood Chain:
-the Liquidity Book volatility-accumulator fee model (LFJ `joe-v2`, MIT — the same
-mechanism behind Meteora's DLMM dynamic fees) on standard v4 pools. Low base fee
-in calm markets, surging fee during volatility, decaying back after. Fee-override
-permission bits only: no custody, no owner, no upgradeability, no protocol fee.
+**Friar** (`src/Friar.sol`) is a **DLMM** — Dynamic Liquidity Market Maker — built as a
+Uniswap v4 dynamic-fee hook for Robinhood Chain: the Liquidity Book volatility-accumulator
+fee model (LFJ `joe-v2`, MIT — LFJ calls Liquidity Book a DLMM too; it's the same
+mechanism behind Meteora's DLMM fees) on standard v4 pools. Low base fee in calm markets,
+surging fee during volatility, decaying back after. Fee-override permission bits only:
+no custody, no owner, no upgradeability, no protocol fee.
+
+The base fee is a **pool** choice, not a hook constant: `base = baseFactor × tickSpacing`,
+so one deployed hook serves 0.30%/0.50%/0.80%/1.00% pools depending on the spacing chosen
+at `initialize()`. See `docs/SPEC.md`.
 
 See `docs/SPEC.md` for the mechanism, deviations from Liquidity Book, and
 deployment details.
