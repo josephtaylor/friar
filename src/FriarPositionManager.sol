@@ -7,7 +7,7 @@ import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
-import {CurrencySettler} from "v4-core/test/utils/CurrencySettler.sol";
+import {CurrencySettler} from "./CurrencySettler.sol";
 import {TransientStateLibrary} from "v4-core/src/libraries/TransientStateLibrary.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {ModifyLiquidityParams, SwapParams} from "v4-core/src/types/PoolOperation.sol";
@@ -21,11 +21,13 @@ import {ModifyLiquidityParams, SwapParams} from "v4-core/src/types/PoolOperation
 /// The full position definition (owner + pool key + bins) lives on-chain: an owner can
 /// exit knowing only the positionId, with no dependency on any off-chain service.
 ///
-/// Fee share: `perfFeeBps` of fees earned (v4's `feesAccrued`, reported separately from
+/// Fee share: a slice of fees earned (v4's `feesAccrued`, reported separately from
 /// principal by modifyLiquidity) is taken in-kind to the treasury whenever fees are
-/// collected. Principal is never touched. The rate is immutable; the treasury address
-/// (two-step transferable) is the only privileged state. `perfFeeExempt` (the house bot)
-/// pays no perf fee. Payouts always go to the position owner — never a third address.
+/// collected — `simpleFeeBps` for single-bin ("simple") positions, `perfFeeBps` for
+/// shaped (multi-bin) ones. A position's bin count is fixed at open, so its rate is
+/// fixed for life. Principal is never touched. Both rates are immutable; the treasury
+/// address (two-step transferable) is the only privileged state. `perfFeeExempt` (the
+/// house bot) pays no fee. Payouts always go to the position owner — never a third address.
 contract FriarPositionManager is IUnlockCallback {
     using CurrencySettler for Currency;
     using TransientStateLibrary for IPoolManager;
@@ -45,13 +47,18 @@ contract FriarPositionManager is IUnlockCallback {
     error NotTreasury();
     error NotPendingTreasury();
     error PerfFeeTooHigh();
+    error InvalidStartingPositionId();
+    error ZeroTreasury();
 
     uint256 public constant MAX_BINS = 100;
     uint256 public constant MAX_PERF_FEE_BPS = 2_000; // hard sanity cap: 20%
     uint256 internal constant BPS = 10_000;
 
     IPoolManager public immutable manager;
+    /// @notice fee share (bps of fees earned) for shaped — multi-bin — positions.
     uint16 public immutable perfFeeBps;
+    /// @notice fee share (bps of fees earned) for simple — single-bin — positions.
+    uint16 public immutable simpleFeeBps;
     /// @notice fee-exempt accounts (house bot, partners). Treasury-controlled: a
     /// discount-only power — it can never raise fees or touch principal. Checked at
     /// operation time, so changes apply to existing positions' future collections.
@@ -111,11 +118,22 @@ contract FriarPositionManager is IUnlockCallback {
         Action action;
         uint256 positionId;
         address account; // position owner: sole payer and sole payout recipient
-        bool exempt;
+        uint16 feeBps; // resolved at verb entry: 0 when exempt, else simple/perf rate by bin count
         PoolKey key;
         BinDelta[] bins;
         SwapIn swapIn;
         Zap zap;
+    }
+
+    /// @dev Slippage bounds for an exit. Grouped so the verbs stay under the stack limit.
+    /// `maxPay` is what keeps a hostile zap venue from turning an exit into a withdrawal
+    /// from the owner's wallet: `_resolve` settles any negative delta via transferFrom,
+    /// and a venue hook may return an unbounded swap delta.
+    struct Bounds {
+        uint256 minReceive0;
+        uint256 minReceive1;
+        uint256 maxPay0;
+        uint256 maxPay1;
     }
 
     /// @dev delta0/delta1: the owner's net cash flow (positive = received, negative = paid).
@@ -130,7 +148,10 @@ contract FriarPositionManager is IUnlockCallback {
 
     mapping(uint256 => Position) internal _positions;
     mapping(address => uint256[]) internal _ownerIds;
-    uint256 public nextPositionId = 1;
+    /// @notice Next id to mint. Set at construction so a redeployed manager can continue
+    /// past a previous deployment's ids instead of reusing them — position history is
+    /// indexed off-chain by id, and colliding ids would clobber it.
+    uint256 public nextPositionId;
 
     event PositionOpened(
         uint256 indexed positionId,
@@ -142,7 +163,12 @@ contract FriarPositionManager is IUnlockCallback {
         int256 delta1
     );
     event PositionIncreased(
-        uint256 indexed positionId, uint128[] liquidityDeltas, int256 delta0, int256 delta1, uint256 fees0, uint256 fees1
+        uint256 indexed positionId,
+        uint128[] liquidityDeltas,
+        int256 delta0,
+        int256 delta1,
+        uint256 fees0,
+        uint256 fees1
     );
     event PositionDecreased(
         uint256 indexed positionId,
@@ -159,10 +185,28 @@ contract FriarPositionManager is IUnlockCallback {
     event TreasuryTransferStarted(address indexed from, address indexed to);
     event TreasuryTransferred(address indexed from, address indexed to);
 
-    constructor(IPoolManager _manager, uint16 _perfFeeBps, address _treasury, address _perfFeeExempt) {
-        if (_perfFeeBps > MAX_PERF_FEE_BPS) revert PerfFeeTooHigh();
+    constructor(
+        IPoolManager _manager,
+        uint16 _perfFeeBps,
+        uint16 _simpleFeeBps,
+        address _treasury,
+        address _perfFeeExempt,
+        uint256 _startingPositionId
+    ) {
+        if (_perfFeeBps > MAX_PERF_FEE_BPS || _simpleFeeBps > MAX_PERF_FEE_BPS) {
+            revert PerfFeeTooHigh();
+        }
+        if (_startingPositionId == 0) revert InvalidStartingPositionId();
+        // A zero treasury would send every perf fee to address(0) — burned, unrecoverable,
+        // and unfixable since `treasury` is only reachable through the two-step transfer
+        // (which itself can never RESULT in zero: `acceptTreasury` sets treasury to
+        // msg.sender, and address(0) cannot originate a transaction, so `setTreasury(0)`
+        // merely cancels a pending handover). The constructor is the only way in.
+        if (_treasury == address(0)) revert ZeroTreasury();
+        nextPositionId = _startingPositionId;
         manager = _manager;
         perfFeeBps = _perfFeeBps;
+        simpleFeeBps = _simpleFeeBps;
         treasury = _treasury;
         if (_perfFeeExempt != address(0)) {
             perfFeeExempt[_perfFeeExempt] = true;
@@ -223,7 +267,8 @@ contract FriarPositionManager is IUnlockCallback {
         p.ownerIndex = uint96(_ownerIds[msg.sender].length - 1);
 
         Zap memory noZap;
-        OpResult memory r = _run(Op(Action.Open, positionId, msg.sender, _isExempt(msg.sender), key, deltas, swapIn, noZap));
+        OpResult memory r =
+            _run(Op(Action.Open, positionId, msg.sender, _feeRate(msg.sender, n), key, deltas, swapIn, noZap));
         _checkPay(r, maxPay0, maxPay1);
 
         emit PositionOpened(positionId, msg.sender, PoolId.unwrap(key.toId()), key, bins, r.delta0, r.delta1);
@@ -243,17 +288,28 @@ contract FriarPositionManager is IUnlockCallback {
         uint256 n = p.bins.length;
         if (liquidityDeltas.length != n) revert LengthMismatch();
 
-        BinDelta[] memory deltas = new BinDelta[](n);
-        for (uint256 i = 0; i < n; i++) {
-            uint128 d = liquidityDeltas[i];
-            Bin storage b = p.bins[i];
-            if (d > 0) b.liquidity += d;
-            deltas[i] = BinDelta(b.tickLower, b.tickUpper, int256(uint256(d)), binSalt(positionId, i));
+        BinDelta[] memory deltas;
+        {
+            uint256 m;
+            for (uint256 i = 0; i < n; i++) {
+                if (p.bins[i].liquidity > 0 || liquidityDeltas[i] > 0) m++;
+            }
+            deltas = new BinDelta[](m);
+        }
+        {
+            uint256 k;
+            for (uint256 i = 0; i < n; i++) {
+                uint128 d = liquidityDeltas[i];
+                Bin storage b = p.bins[i];
+                if (b.liquidity == 0 && d == 0) continue; // v4 rejects a 0-delta poke on an empty position
+                if (d > 0) b.liquidity += d;
+                deltas[k++] = BinDelta(b.tickLower, b.tickUpper, int256(uint256(d)), binSalt(positionId, i));
+            }
         }
 
         Zap memory noZap;
         OpResult memory r =
-            _run(Op(Action.Increase, positionId, msg.sender, _isExempt(msg.sender), p.key, deltas, swapIn, noZap));
+            _run(Op(Action.Increase, positionId, msg.sender, _feeRate(msg.sender, n), p.key, deltas, swapIn, noZap));
         _checkPay(r, maxPay0, maxPay1);
 
         emit PositionIncreased(positionId, liquidityDeltas, r.delta0, r.delta1, r.fees0, r.fees1);
@@ -261,13 +317,17 @@ contract FriarPositionManager is IUnlockCallback {
     }
 
     /// @notice Remove liquidity (amount per bin). Removing everything deletes the
-    /// record. `minReceive0/1` floor the owner's net receipts (post-perf fee, post-zap).
+    /// record. `minReceive0/1` floor the owner's net receipts (post-perf fee, post-zap);
+    /// `maxPay0/1` cap what the exit may charge the owner (pass 0 for the normal case —
+    /// an exit that pays out on both sides).
     function decrease(
         uint256 positionId,
         uint128[] calldata liquidityDeltas,
         Zap calldata zap,
         uint256 minReceive0,
-        uint256 minReceive1
+        uint256 minReceive1,
+        uint256 maxPay0,
+        uint256 maxPay1
     ) external {
         Position storage p = _requireOwner(positionId);
         uint256 n = p.bins.length;
@@ -276,38 +336,64 @@ contract FriarPositionManager is IUnlockCallback {
         for (uint256 i = 0; i < n; i++) {
             ds[i] = liquidityDeltas[i];
         }
-        _decrease(positionId, p, ds, zap, minReceive0, minReceive1);
+        _decrease(positionId, p, ds, zap, Bounds(minReceive0, minReceive1, maxPay0, maxPay1));
     }
 
     /// @notice Exit knowing only the positionId: removes all remaining liquidity using
     /// the on-chain record. No bins, no off-chain data, no backend required.
-    function close(uint256 positionId, Zap calldata zap, uint256 minReceive0, uint256 minReceive1) external {
+    function close(
+        uint256 positionId,
+        Zap calldata zap,
+        uint256 minReceive0,
+        uint256 minReceive1,
+        uint256 maxPay0,
+        uint256 maxPay1
+    ) external {
         Position storage p = _requireOwner(positionId);
         uint256 n = p.bins.length;
         uint128[] memory ds = new uint128[](n);
         for (uint256 i = 0; i < n; i++) {
             ds[i] = p.bins[i].liquidity;
         }
-        _decrease(positionId, p, ds, zap, minReceive0, minReceive1);
+        _decrease(positionId, p, ds, zap, Bounds(minReceive0, minReceive1, maxPay0, maxPay1));
     }
 
     /// @notice Claim fees without touching liquidity (a 0-delta poke on every bin).
     /// Fee amounts don't depend on price, so no-zap collection needs no floors; with a
-    /// zap the floors guard the swap output.
-    function collect(uint256 positionId, Zap calldata zap, uint256 minReceive0, uint256 minReceive1) external {
+    /// zap the floors guard the swap output and `maxPay0/1` cap what it may charge.
+    function collect(
+        uint256 positionId,
+        Zap calldata zap,
+        uint256 minReceive0,
+        uint256 minReceive1,
+        uint256 maxPay0,
+        uint256 maxPay1
+    ) external {
         Position storage p = _requireOwner(positionId);
         uint256 n = p.bins.length;
 
-        BinDelta[] memory deltas = new BinDelta[](n);
-        for (uint256 i = 0; i < n; i++) {
-            Bin storage b = p.bins[i];
-            deltas[i] = BinDelta(b.tickLower, b.tickUpper, 0, binSalt(positionId, i));
+        BinDelta[] memory deltas;
+        {
+            uint256 m;
+            for (uint256 i = 0; i < n; i++) {
+                if (p.bins[i].liquidity > 0) m++;
+            }
+            deltas = new BinDelta[](m);
+        }
+        {
+            uint256 k;
+            for (uint256 i = 0; i < n; i++) {
+                Bin storage b = p.bins[i];
+                if (b.liquidity == 0) continue; // an emptied bin holds no fees and cannot be poked
+                deltas[k++] = BinDelta(b.tickLower, b.tickUpper, 0, binSalt(positionId, i));
+            }
         }
 
         SwapIn memory noSwapIn;
         OpResult memory r =
-            _run(Op(Action.Collect, positionId, msg.sender, _isExempt(msg.sender), p.key, deltas, noSwapIn, zap));
+            _run(Op(Action.Collect, positionId, msg.sender, _feeRate(msg.sender, n), p.key, deltas, noSwapIn, zap));
         _checkReceive(r, minReceive0, minReceive1);
+        _checkPay(r, maxPay0, maxPay1);
 
         emit FeesCollected(positionId, r.fees0, r.fees1, r.delta0, r.delta1);
         _emitPerfFee(positionId, r);
@@ -366,8 +452,11 @@ contract FriarPositionManager is IUnlockCallback {
         if (p.owner != msg.sender) revert NotPositionOwner();
     }
 
-    function _isExempt(address account) internal view returns (bool) {
-        return perfFeeExempt[account];
+    /// @dev Fee rate for an operation: exempt accounts pay nothing; single-bin ("simple")
+    /// positions pay simpleFeeBps; shaped (multi-bin) positions pay perfFeeBps.
+    function _feeRate(address account, uint256 binCount) internal view returns (uint16) {
+        if (perfFeeExempt[account]) return 0;
+        return binCount == 1 ? simpleFeeBps : perfFeeBps;
     }
 
     function _decrease(
@@ -375,25 +464,36 @@ contract FriarPositionManager is IUnlockCallback {
         Position storage p,
         uint128[] memory liquidityDeltas,
         Zap calldata zap,
-        uint256 minReceive0,
-        uint256 minReceive1
+        Bounds memory bounds
     ) internal {
         uint256 n = p.bins.length;
         bool anyLeft = false;
-        BinDelta[] memory deltas = new BinDelta[](n);
-        for (uint256 i = 0; i < n; i++) {
-            uint128 d = liquidityDeltas[i];
-            Bin storage b = p.bins[i];
-            if (d > b.liquidity) revert DecreaseExceedsLiquidity();
-            b.liquidity -= d;
-            if (b.liquidity > 0) anyLeft = true;
-            deltas[i] = BinDelta(b.tickLower, b.tickUpper, -int256(uint256(d)), binSalt(positionId, i));
+        BinDelta[] memory deltas;
+        {
+            uint256 m;
+            for (uint256 i = 0; i < n; i++) {
+                if (p.bins[i].liquidity > 0) m++;
+            }
+            deltas = new BinDelta[](m);
+        }
+        {
+            uint256 k;
+            for (uint256 i = 0; i < n; i++) {
+                uint128 d = liquidityDeltas[i];
+                Bin storage b = p.bins[i];
+                if (d > b.liquidity) revert DecreaseExceedsLiquidity();
+                if (b.liquidity == 0) continue; // already emptied — v4 rejects a 0-delta poke here
+                b.liquidity -= d;
+                if (b.liquidity > 0) anyLeft = true;
+                deltas[k++] = BinDelta(b.tickLower, b.tickUpper, -int256(uint256(d)), binSalt(positionId, i));
+            }
         }
 
         SwapIn memory noSwapIn;
         OpResult memory r =
-            _run(Op(Action.Decrease, positionId, msg.sender, _isExempt(msg.sender), p.key, deltas, noSwapIn, zap));
-        _checkReceive(r, minReceive0, minReceive1);
+            _run(Op(Action.Decrease, positionId, msg.sender, _feeRate(msg.sender, n), p.key, deltas, noSwapIn, zap));
+        _checkReceive(r, bounds.minReceive0, bounds.minReceive1);
+        _checkPay(r, bounds.maxPay0, bounds.maxPay1);
 
         bool closed = !anyLeft;
         emit PositionDecreased(positionId, liquidityDeltas, r.delta0, r.delta1, r.fees0, r.fees1, closed);
@@ -471,10 +571,7 @@ contract FriarPositionManager is IUnlockCallback {
             (, BalanceDelta feesAccrued) = manager.modifyLiquidity(
                 op.key,
                 ModifyLiquidityParams({
-                    tickLower: b.tickLower,
-                    tickUpper: b.tickUpper,
-                    liquidityDelta: b.liquidityDelta,
-                    salt: b.salt
+                    tickLower: b.tickLower, tickUpper: b.tickUpper, liquidityDelta: b.liquidityDelta, salt: b.salt
                 }),
                 ""
             );
@@ -484,9 +581,9 @@ contract FriarPositionManager is IUnlockCallback {
             if (f1 > 0) r.fees1 += uint256(uint128(f1));
         }
 
-        if (!op.exempt && perfFeeBps > 0) {
-            r.perf0 = (r.fees0 * perfFeeBps) / BPS;
-            r.perf1 = (r.fees1 * perfFeeBps) / BPS;
+        if (op.feeBps > 0) {
+            r.perf0 = (r.fees0 * op.feeBps) / BPS;
+            r.perf1 = (r.fees1 * op.feeBps) / BPS;
             if (r.perf0 > 0) op.key.currency0.take(manager, treasury, r.perf0, false);
             if (r.perf1 > 0) op.key.currency1.take(manager, treasury, r.perf1, false);
         }

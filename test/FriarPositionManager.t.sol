@@ -41,13 +41,16 @@ contract FriarPositionManagerTest is Test, Deployers {
             flags
         );
         friar = Friar(flags);
-        (key,) = initPool(currency0, currency1, IHooks(address(friar)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 100, SQRT_PRICE_1_1);
+        (key,) =
+            initPool(currency0, currency1, IHooks(address(friar)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 100, SQRT_PRICE_1_1);
         // background book so zaps have liquidity after our bins burn
         modifyLiquidityRouter.modifyLiquidity(
-            key, ModifyLiquidityParams({tickLower: -30_000, tickUpper: 30_000, liquidityDelta: 500e18, salt: 0}), ZERO_BYTES
+            key,
+            ModifyLiquidityParams({tickLower: -30_000, tickUpper: 30_000, liquidityDelta: 500e18, salt: 0}),
+            ZERO_BYTES
         );
 
-        fpm = new FriarPositionManager(manager, 1000, treasury, bot); // 10% perf fee
+        fpm = new FriarPositionManager(manager, 1000, 100, treasury, bot, 1); // 10% shaped / 1% simple
 
         t0 = MockERC20(Currency.unwrap(currency0));
         t1 = MockERC20(Currency.unwrap(currency1));
@@ -121,7 +124,7 @@ contract FriarPositionManagerTest is Test, Deployers {
         uint256 t1Before = t1.balanceOf(alice);
 
         vm.prank(alice);
-        fpm.close(id, _noZap(), 0, 0); // knows ONLY the id
+        fpm.close(id, _noZap(), 0, 0, 0, 0); // knows ONLY the id
 
         assertGt(t0.balanceOf(alice) - t0Before + (t1.balanceOf(alice) - t1Before), 0);
         vm.expectRevert(FriarPositionManager.UnknownPosition.selector);
@@ -137,7 +140,7 @@ contract FriarPositionManagerTest is Test, Deployers {
         uint256 t1Before = t1.balanceOf(alice);
 
         vm.prank(alice);
-        fpm.close(id, _zap(true), 0, 1); // zap inventory -> token1, expect some quote
+        fpm.close(id, _zap(true), 0, 1, 0, 0); // zap inventory -> token1, expect some quote
 
         assertEq(t0.balanceOf(alice) - t0Before, 0, "zap should leave no token0");
         assertGt(t1.balanceOf(alice) - t1Before, 0, "should receive quote");
@@ -149,7 +152,7 @@ contract FriarPositionManagerTest is Test, Deployers {
 
         vm.prank(alice);
         vm.expectRevert(FriarPositionManager.ReceivedTooLittle.selector);
-        fpm.close(id, _zap(true), 0, type(uint128).max);
+        fpm.close(id, _zap(true), 0, type(uint128).max, 0, 0);
     }
 
     function test_partialDecrease_keepsPositionOpen() public {
@@ -158,15 +161,68 @@ contract FriarPositionManagerTest is Test, Deployers {
         uint128[] memory ds = new uint128[](3);
         ds[0] = 5e18; // half of bin 0
         vm.prank(alice);
-        fpm.decrease(id, ds, _noZap(), 0, 0);
+        fpm.decrease(id, ds, _noZap(), 0, 0, 0, 0);
 
         (,, FriarPositionManager.Bin[] memory bins) = fpm.getPosition(id);
         assertEq(bins[0].liquidity, 5e18);
         assertEq(bins[1].liquidity, 20e18);
 
         vm.prank(alice);
-        fpm.close(id, _noZap(), 0, 0);
+        fpm.close(id, _noZap(), 0, 0, 0, 0);
         assertEq(fpm.positionsOf(alice).length, 0);
+    }
+
+    /// Regression (found by the invariant suite): emptying ONE bin of a multi-bin position
+    /// used to brick it. Every verb pokes every bin, and v4 reverts `CannotUpdateEmptyPosition`
+    /// on a 0-delta poke of a 0-liquidity position — so collect/decrease/close all reverted
+    /// and the only escape was to deposit more liquidity into the emptied bin.
+    function test_emptiedBin_positionStaysUsable() public {
+        uint256 id = _open(alice);
+
+        uint128[] memory ds = new uint128[](3);
+        ds[0] = 10e18; // zero out bin 0 exactly, leaving bins 1 and 2 alive
+        vm.prank(alice);
+        fpm.decrease(id, ds, _noZap(), 0, 0, 0, 0);
+
+        (,, FriarPositionManager.Bin[] memory bins) = fpm.getPosition(id);
+        assertEq(bins[0].liquidity, 0, "bin 0 should be empty");
+        assertEq(bins[1].liquidity, 20e18, "bin 1 untouched");
+
+        swap(key, true, -20e18, ZERO_BYTES); // accrue fees on the surviving bins
+
+        // all three must still work with an emptied bin present
+        vm.prank(alice);
+        fpm.collect(id, _noZap(), 0, 0, 0, 0);
+
+        uint128[] memory more = new uint128[](3);
+        more[1] = 1e18;
+        vm.prank(alice);
+        fpm.increase(id, more, _noSwapIn(), type(uint256).max, type(uint256).max);
+
+        vm.prank(alice);
+        fpm.close(id, _noZap(), 0, 0, 0, 0);
+        assertEq(fpm.positionsOf(alice).length, 0, "position must remain closable");
+    }
+
+    /// The emptied bin can still be refilled — skipping it must not orphan it.
+    function test_emptiedBin_canBeRefilled() public {
+        uint256 id = _open(alice);
+        uint128[] memory ds = new uint128[](3);
+        ds[0] = 10e18;
+        vm.prank(alice);
+        fpm.decrease(id, ds, _noZap(), 0, 0, 0, 0);
+
+        uint128[] memory refill = new uint128[](3);
+        refill[0] = 7e18;
+        vm.prank(alice);
+        fpm.increase(id, refill, _noSwapIn(), type(uint256).max, type(uint256).max);
+
+        (,, FriarPositionManager.Bin[] memory bins) = fpm.getPosition(id);
+        assertEq(bins[0].liquidity, 7e18, "refill must land in the emptied bin");
+        uint128 liq = manager.getPositionLiquidity(
+            key.toId(), Position.calculatePositionKey(address(fpm), -100, 0, fpm.binSalt(id, 0))
+        );
+        assertEq(liq, 7e18, "refill must reach the PoolManager under the same salt");
     }
 
     function test_decrease_tooMuch_reverts() public {
@@ -175,7 +231,7 @@ contract FriarPositionManagerTest is Test, Deployers {
         ds[0] = 11e18; // bin 0 only has 10e18
         vm.prank(alice);
         vm.expectRevert(FriarPositionManager.DecreaseExceedsLiquidity.selector);
-        fpm.decrease(id, ds, _noZap(), 0, 0);
+        fpm.decrease(id, ds, _noZap(), 0, 0, 0, 0);
     }
 
     function test_increase_growsBins() public {
@@ -206,7 +262,9 @@ contract FriarPositionManagerTest is Test, Deployers {
         fpm.open(
             key,
             bins,
-            FriarPositionManager.SwapIn({enabled: true, venue: key, zeroForOne: false, amountIn: 1e18, minAmountOut: 1e17, sqrtPriceLimitX96: 0}),
+            FriarPositionManager.SwapIn({
+                enabled: true, venue: key, zeroForOne: false, amountIn: 1e18, minAmountOut: 1e17, sqrtPriceLimitX96: 0
+            }),
             type(uint256).max,
             type(uint256).max
         );
@@ -294,7 +352,7 @@ contract FriarPositionManagerTest is Test, Deployers {
         uint256 tr1 = t1.balanceOf(treasury);
 
         vm.prank(alice);
-        fpm.collect(id, _noZap(), 0, 0);
+        fpm.collect(id, _noZap(), 0, 0, 0, 0);
 
         uint256 got0 = t0.balanceOf(alice) - a0;
         uint256 got1 = t1.balanceOf(alice) - a1;
@@ -308,17 +366,59 @@ contract FriarPositionManagerTest is Test, Deployers {
         assertGt(perf0 + perf1, 0, "treasury got nothing");
     }
 
+    /// A single-bin ("simple") position pays simpleFeeBps (1%), not perfFeeBps —
+    /// collect returns fees only, so the 99/1 split is exactly observable.
+    function test_collect_simplePosition_chargesSimpleRate() public {
+        FriarPositionManager.Bin[] memory bins = new FriarPositionManager.Bin[](1);
+        bins[0] = FriarPositionManager.Bin(-300, 0, 30e18);
+        vm.prank(alice);
+        uint256 id = fpm.open(key, bins, _noSwapIn(), type(uint256).max, type(uint256).max);
+        swap(key, true, -20e18, ZERO_BYTES); // through the bin -> token0 fees
+        swap(key, false, -20e18, ZERO_BYTES); // and back -> token1 fees
+
+        uint256 a0 = t0.balanceOf(alice);
+        uint256 a1 = t1.balanceOf(alice);
+        uint256 tr0 = t0.balanceOf(treasury);
+        uint256 tr1 = t1.balanceOf(treasury);
+
+        vm.prank(alice);
+        fpm.collect(id, _noZap(), 0, 0, 0, 0);
+
+        uint256 got0 = t0.balanceOf(alice) - a0;
+        uint256 got1 = t1.balanceOf(alice) - a1;
+        uint256 perf0 = t0.balanceOf(treasury) - tr0;
+        uint256 perf1 = t1.balanceOf(treasury) - tr1;
+
+        assertGt(perf0 + perf1, 0, "treasury got nothing");
+        if (perf0 > 0) assertApproxEqAbs(got0, perf0 * 99, 99, "token0 split not 99/1");
+        if (perf1 > 0) assertApproxEqAbs(got1, perf1 * 99, 99, "token1 split not 99/1");
+    }
+
+    /// The simple rate applies on every verb that surfaces fees, not just collect.
+    function test_close_simplePosition_chargesSimpleRate() public {
+        FriarPositionManager.Bin[] memory bins = new FriarPositionManager.Bin[](1);
+        bins[0] = FriarPositionManager.Bin(-300, 0, 30e18);
+        vm.prank(alice);
+        uint256 id = fpm.open(key, bins, _noSwapIn(), type(uint256).max, type(uint256).max);
+        swap(key, true, -20e18, ZERO_BYTES);
+
+        uint256 tr0 = t0.balanceOf(treasury);
+        vm.prank(alice);
+        fpm.close(id, _noZap(), 0, 0, 0, 0);
+        assertGt(t0.balanceOf(treasury), tr0, "close must charge the simple rate on accrued fees");
+    }
+
     function test_collect_secondCollectYieldsNothing() public {
         uint256 id = _open(alice);
         swap(key, true, -20e18, ZERO_BYTES);
 
         vm.prank(alice);
-        fpm.collect(id, _noZap(), 0, 0);
+        fpm.collect(id, _noZap(), 0, 0, 0, 0);
 
         uint256 a0 = t0.balanceOf(alice);
         uint256 a1 = t1.balanceOf(alice);
         vm.prank(alice);
-        fpm.collect(id, _noZap(), 0, 0);
+        fpm.collect(id, _noZap(), 0, 0, 0, 0);
         assertEq(t0.balanceOf(alice), a0);
         assertEq(t1.balanceOf(alice), a1);
     }
@@ -331,7 +431,7 @@ contract FriarPositionManagerTest is Test, Deployers {
         uint256 tr0 = t0.balanceOf(treasury);
         uint256 tr1 = t1.balanceOf(treasury);
         vm.prank(bot);
-        fpm.collect(id, _noZap(), 0, 0);
+        fpm.collect(id, _noZap(), 0, 0, 0, 0);
         assertEq(t0.balanceOf(treasury), tr0, "exempt op must not perf fee");
         assertEq(t1.balanceOf(treasury), tr1, "exempt op must not perf fee");
     }
@@ -342,7 +442,7 @@ contract FriarPositionManagerTest is Test, Deployers {
 
         uint256 tr0 = t0.balanceOf(treasury);
         vm.prank(alice);
-        fpm.close(id, _noZap(), 0, 0);
+        fpm.close(id, _noZap(), 0, 0, 0, 0);
         assertGt(t0.balanceOf(treasury), tr0, "close must perf fee accrued fees");
     }
 
@@ -354,11 +454,11 @@ contract FriarPositionManagerTest is Test, Deployers {
         uint128[] memory ds = new uint128[](3);
         vm.startPrank(bob);
         vm.expectRevert(FriarPositionManager.NotPositionOwner.selector);
-        fpm.close(id, _noZap(), 0, 0);
+        fpm.close(id, _noZap(), 0, 0, 0, 0);
         vm.expectRevert(FriarPositionManager.NotPositionOwner.selector);
-        fpm.decrease(id, ds, _noZap(), 0, 0);
+        fpm.decrease(id, ds, _noZap(), 0, 0, 0, 0);
         vm.expectRevert(FriarPositionManager.NotPositionOwner.selector);
-        fpm.collect(id, _noZap(), 0, 0);
+        fpm.collect(id, _noZap(), 0, 0, 0, 0);
         vm.expectRevert(FriarPositionManager.NotPositionOwner.selector);
         fpm.increase(id, ds, _noSwapIn(), 0, 0);
         vm.stopPrank();
@@ -376,7 +476,7 @@ contract FriarPositionManagerTest is Test, Deployers {
         uint256 id3 = _open(alice);
 
         vm.prank(alice);
-        fpm.close(id1, _noZap(), 0, 0);
+        fpm.close(id1, _noZap(), 0, 0, 0, 0);
 
         uint256[] memory ids = fpm.positionsOf(alice);
         assertEq(ids.length, 2);
@@ -440,12 +540,71 @@ contract FriarPositionManagerTest is Test, Deployers {
         foreign.currency0 = Currency.wrap(address(0xDEAD));
         vm.prank(alice);
         vm.expectRevert(FriarPositionManager.VenueMismatch.selector);
-        fpm.close(id, FriarPositionManager.Zap({enabled: true, venue: foreign, zeroForOne: true}), 0, 0);
+        fpm.close(id, FriarPositionManager.Zap({enabled: true, venue: foreign, zeroForOne: true}), 0, 0, 0, 0);
     }
 
     function test_constructor_perfFeeCap() public {
         vm.expectRevert(FriarPositionManager.PerfFeeTooHigh.selector);
-        new FriarPositionManager(manager, 2001, treasury, bot);
+        new FriarPositionManager(manager, 2001, 100, treasury, bot, 1);
+        vm.expectRevert(FriarPositionManager.PerfFeeTooHigh.selector);
+        new FriarPositionManager(manager, 1000, 2001, treasury, bot, 1);
+    }
+
+    /// A redeploy must be able to continue past the previous manager's ids: off-chain
+    /// position history is keyed by id, so restarting at 1 would clobber it.
+    function test_startingPositionId_continuesPastPriorDeployment() public {
+        FriarPositionManager next = new FriarPositionManager(manager, 1000, 100, treasury, bot, 10);
+        assertEq(next.nextPositionId(), 10);
+
+        vm.startPrank(alice);
+        t0.approve(address(next), type(uint256).max);
+        t1.approve(address(next), type(uint256).max);
+        uint256 id = next.open(key, _threeBinBids(), _noSwapIn(), type(uint256).max, type(uint256).max);
+        vm.stopPrank();
+
+        assertEq(id, 10, "first id must be the configured start");
+        assertEq(next.nextPositionId(), 11);
+        (address owner,,) = next.getPosition(id);
+        assertEq(owner, alice);
+    }
+
+    /// A zero treasury would burn every perf fee to address(0), unrecoverably.
+    function test_constructor_rejectsZeroTreasury() public {
+        vm.expectRevert(FriarPositionManager.ZeroTreasury.selector);
+        new FriarPositionManager(manager, 1000, 100, address(0), bot, 1);
+    }
+
+    /// The two-step handover can never RESULT in a zero treasury: `acceptTreasury` sets
+    /// treasury to msg.sender, and address(0) cannot originate a transaction. So
+    /// `setTreasury(0)` is only a cancel — the incumbent keeps control, nothing is
+    /// stranded. (This is why the constructor is the only place the check is needed.)
+    function test_setTreasuryZero_isOnlyACancel() public {
+        address newTreasury = makeAddr("newTreasury");
+        vm.prank(treasury);
+        fpm.setTreasury(newTreasury);
+        assertEq(fpm.pendingTreasury(), newTreasury);
+
+        vm.prank(treasury);
+        fpm.setTreasury(address(0)); // cancel the handover
+        assertEq(fpm.pendingTreasury(), address(0));
+        assertEq(fpm.treasury(), treasury, "incumbent must retain control");
+
+        // the cancelled candidate can no longer claim it
+        vm.prank(newTreasury);
+        vm.expectRevert(FriarPositionManager.NotPendingTreasury.selector);
+        fpm.acceptTreasury();
+
+        // and the incumbent can still hand over to someone real
+        vm.prank(treasury);
+        fpm.setTreasury(newTreasury);
+        vm.prank(newTreasury);
+        fpm.acceptTreasury();
+        assertEq(fpm.treasury(), newTreasury);
+    }
+
+    function test_constructor_rejectsZeroStartingId() public {
+        vm.expectRevert(FriarPositionManager.InvalidStartingPositionId.selector);
+        new FriarPositionManager(manager, 1000, 100, treasury, bot, 0);
     }
 
     function test_setPerfFeeExempt_treasuryGated() public {
@@ -470,7 +629,7 @@ contract FriarPositionManagerTest is Test, Deployers {
 
         uint256 tr0 = t0.balanceOf(treasury);
         vm.prank(alice);
-        fpm.collect(id, _noZap(), 0, 0);
+        fpm.collect(id, _noZap(), 0, 0, 0, 0);
         assertEq(t0.balanceOf(treasury), tr0, "exemption must apply to future collections");
 
         // revoke, accrue more fees, collect again: fee flows again
@@ -479,7 +638,7 @@ contract FriarPositionManagerTest is Test, Deployers {
         swap(key, false, -20e18, ZERO_BYTES);
         swap(key, true, -20e18, ZERO_BYTES);
         vm.prank(alice);
-        fpm.collect(id, _noZap(), 0, 0);
+        fpm.collect(id, _noZap(), 0, 0, 0, 0);
         assertGt(t0.balanceOf(treasury) + t1.balanceOf(treasury), tr0, "revocation must restore the fee");
     }
 

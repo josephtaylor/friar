@@ -9,14 +9,19 @@ import {FriarPositionManager} from "../src/FriarPositionManager.sol";
 /// @notice Deploys the FriarPositionManager. No address mining needed (not a hook).
 /// Verify the source on the explorer immediately after deploy.
 ///
-/// Usage:
-///   forge script script/DeployFriarPositionManager.s.sol --rpc-url $RH_RPC_URL \
+/// Usage ("robinhood" is a named endpoint in foundry.toml):
+///   TREASURY=0x1fe8E51635636628415f5dee7bc71A3d7A6cF9BE \
+///   forge script script/DeployFriarPositionManager.s.sol --rpc-url robinhood \
 ///     --broadcast --account tuck-deployer
 ///
 /// Overrides:
-///   PERF_FEE_BPS     fee share in bps (default 1000 = 10%, hard cap 2000)
-///   TREASURY     perf fee recipient   (default: the broadcasting sender)
+///   PERF_FEE_BPS     shaped (multi-bin) fee share in bps (default 1000 = 10%, hard cap 2000)
+///   SIMPLE_FEE_BPS   simple (single-bin) fee share in bps (default 100 = 1%, hard cap 2000)
+///   TREASURY     fee recipient        (default: the broadcasting sender)
 ///   PERF_FEE_EXEMPT  house bot        (default: the broadcasting sender)
+///   STARTING_POSITION_ID  first id this deployment mints (default 1). On a REDEPLOY set
+///     this above the previous manager's highest id — off-chain history is keyed by id,
+///     so restarting at 1 would collide with and clobber the old records.
 contract DeployFriarPositionManager is Script {
     // Uniswap v4 PoolManager on Robinhood Chain (4663):
     // https://developers.uniswap.org/contracts/v4/deployments
@@ -24,18 +29,24 @@ contract DeployFriarPositionManager is Script {
 
     function run() external {
         uint16 perfFeeBps = uint16(vm.envOr("PERF_FEE_BPS", uint256(1000)));
+        uint16 simpleFeeBps = uint16(vm.envOr("SIMPLE_FEE_BPS", uint256(100)));
+        uint256 startingPositionId = vm.envOr("STARTING_POSITION_ID", uint256(1));
 
         vm.startBroadcast();
         address sender = msg.sender;
         address treasury = vm.envOr("TREASURY", sender);
         address perfFeeExempt = vm.envOr("PERF_FEE_EXEMPT", sender);
 
-        FriarPositionManager fpm = new FriarPositionManager(IPoolManager(POOL_MANAGER), perfFeeBps, treasury, perfFeeExempt);
+        FriarPositionManager fpm = new FriarPositionManager(
+            IPoolManager(POOL_MANAGER), perfFeeBps, simpleFeeBps, treasury, perfFeeExempt, startingPositionId
+        );
         vm.stopBroadcast();
 
         console2.log("FriarPositionManager deployed:", address(fpm));
         console2.log("  perfFeeBps:", perfFeeBps);
+        console2.log("  simpleFeeBps:", simpleFeeBps);
         console2.log("  treasury:", treasury);
         console2.log("  perfFeeExempt:", perfFeeExempt);
+        console2.log("  startingPositionId:", startingPositionId);
     }
 }
