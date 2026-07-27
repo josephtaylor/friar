@@ -8,5 +8,8 @@ evm_version = "cancun"
 optimizer = true
 optimizer_runs = 800
 
+[rpc_endpoints]
+robinhood = "https://rpc.mainnet.chain.robinhood.com"
+
 [fmt]
 line_length = 120
