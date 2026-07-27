@@ -50,9 +50,7 @@ contract FriarHookTest is Test, Deployers {
         );
 
         modifyLiquidityRouter.modifyLiquidity(
-            key,
-            ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}),
-            ZERO_BYTES
+            key, ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}), ZERO_BYTES
         );
     }
 
@@ -62,8 +60,7 @@ contract FriarHookTest is Test, Deployers {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == SWAP_TOPIC) {
-                (,,,,, uint24 eventFee) =
-                    abi.decode(logs[i].data, (int128, int128, uint160, uint128, int24, uint24));
+                (,,,,, uint24 eventFee) = abi.decode(logs[i].data, (int128, int128, uint160, uint128, int24, uint24));
                 return eventFee;
             }
         }

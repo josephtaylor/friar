@@ -20,10 +20,7 @@ contract FriarMathTest is Test {
 
     function _state() internal pure returns (FriarMath.VolatilityState memory) {
         return FriarMath.VolatilityState({
-            volatilityAccumulator: 0,
-            volatilityReference: 0,
-            bucketReference: 0,
-            lastUpdate: 1000
+            volatilityAccumulator: 0, volatilityReference: 0, bucketReference: 0, lastUpdate: 1000
         });
     }
 
