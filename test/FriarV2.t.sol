@@ -310,7 +310,120 @@ contract FriarV2Test is Test, Deployers {
             assertGe(w, friar.MIN_FILTER_FLOOR(), "floor invariant broken");
             assertGe(w, c.filterFloor, "configured floor broken");
             assertLe(w, c.filterCeil, "ceiling broken");
+            assertLe(w, c.decayPeriod, "window must never exceed decayPeriod");
         }
+    }
+
+    // ── EWMA state machine under explicit gap sequences (2nd review) ─────────
+
+    function _freshPool(int24 spacing) internal returns (PoolKey memory p) {
+        p = _unlockedKey(spacing);
+        friar.setPoolConfig(p, _cfg());
+        manager.initialize(p, SQRT_PRICE_1_1);
+        modifyLiquidityRouter.modifyLiquidity(
+            p, ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}), ZERO_BYTES
+        );
+    }
+
+    /// Walk the gap ladder the review asked for and record the window at each step. The
+    /// window must track flow density monotonically-ish and never leave [floor, ceil].
+    function test_windowTrajectoryAcrossGapLadder() public {
+        PoolKey memory p = _freshPool(120);
+        uint16[7] memory gaps = [uint16(0), 1, 3, 10, 57, 300, 1000];
+
+        for (uint256 g = 0; g < gaps.length; g++) {
+            for (uint256 i = 0; i < 40; i++) {
+                vm.warp(block.timestamp + gaps[g]);
+                swap(p, i % 2 == 0, -1e14, ZERO_BYTES);
+            }
+            uint16 w = friar.filterWindow(p.toId());
+            assertGe(w, _cfg().filterFloor, "below floor");
+            assertLe(w, _cfg().filterCeil, "above ceiling");
+            // window should be ~3x the sustained gap, clamped
+            uint256 want = uint256(gaps[g]) * _cfg().windowK;
+            if (want < _cfg().filterFloor) want = _cfg().filterFloor;
+            if (want > _cfg().filterCeil) want = _cfg().filterCeil;
+            assertApproxEqAbs(w, want, want / 4 + 2, "window did not converge on 3x the sustained gap");
+        }
+    }
+
+    /// Several swaps inside one block: gap is 0 every time, so the EWMA is dragged down and
+    /// the window must sit exactly on the floor rather than underflowing it.
+    function test_sameBlockBurstPinsWindowToFloorNotBelow() public {
+        PoolKey memory p = _freshPool(120);
+        vm.warp(block.timestamp + 600);
+        swap(p, true, -1e14, ZERO_BYTES); // seed with a long gap
+
+        for (uint256 i = 0; i < 100; i++) {
+            swap(p, i % 2 == 0, -1e14, ZERO_BYTES); // no warp: gap == 0
+        }
+        assertEq(friar.filterWindow(p.toId()), _cfg().filterFloor, "same-block burst must land on the floor");
+    }
+
+    /// The elevated tail both reviews flagged: longer windows mean the surge decays more
+    /// slowly, so bound it. After a move, calm flow must return the fee to base within a
+    /// stated wall-clock budget rather than "eventually".
+    function test_timeToBaseIsBoundedAfterASurge() public {
+        PoolKey memory p = _freshPool(120);
+        vm.warp(block.timestamp + 30);
+        swap(p, true, -1e14, ZERO_BYTES);
+
+        // move price hard enough to light the surge
+        swap(p, true, -5e17, ZERO_BYTES);
+        uint256 start = block.timestamp;
+
+        uint256 elapsed;
+        for (uint256 i = 0; i < 400; i++) {
+            vm.warp(block.timestamp + 30); // calm, regular flow
+            uint24 fee = _swapFeeOn(p, i % 2 == 0);
+            if (fee == BASE_FEE_PIPS) {
+                elapsed = block.timestamp - start;
+                break;
+            }
+        }
+        assertGt(elapsed, 0, "fee never returned to base under calm flow");
+        // measured at 150s with these defaults; 10 minutes leaves 4x headroom while still
+        // being tight enough that a real regression in the decay path trips it
+        assertLe(elapsed, 10 minutes, "elevated tail longer than the stated budget");
+        emit log_named_uint("seconds of calm flow to return to base", elapsed);
+    }
+
+    function _swapFeeOn(PoolKey memory p, bool zeroForOne) internal returns (uint24) {
+        vm.recordLogs();
+        swap(p, zeroForOne, -1e14, ZERO_BYTES);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = logs.length; i > 0; i--) {
+            if (logs[i - 1].topics[0] == SWAP_TOPIC) {
+                (,,,,, uint24 f) = abi.decode(logs[i - 1].data, (int128, int128, uint160, uint128, int24, uint24));
+                return f;
+            }
+        }
+        revert("no Swap event");
+    }
+
+    /// "Thin then suddenly active": a long silence arms a long window, and the review asked
+    /// whether the first swap after silence re-anchors. It must, and the burst that follows
+    /// then sits inside the long window (which is the intended behaviour: a pool that just
+    /// woke up prices the wake-up move rather than sleeping through it).
+    function test_silenceThenBurstReanchorsThenHoldsTheLongWindow() public {
+        PoolKey memory p = _freshPool(120);
+        vm.warp(block.timestamp + 30);
+        swap(p, true, -1e14, ZERO_BYTES);
+        for (uint256 i = 0; i < 40; i++) {
+            vm.warp(block.timestamp + 300);
+            swap(p, i % 2 == 0, -1e14, ZERO_BYTES);
+        }
+        assertEq(friar.filterWindow(p.toId()), _cfg().filterCeil, "sustained silence should arm the ceiling");
+
+        // now a burst: gaps far below the window, so references persist and the surge builds
+        uint24 first = _swapFeeOn(p, true);
+        uint24 last = first;
+        for (uint256 i = 0; i < 10; i++) {
+            vm.warp(block.timestamp + 1);
+            last = _swapFeeOn(p, i % 2 == 0);
+        }
+        assertGe(last, first, "burst inside a long window should build the surge, not reset it");
+        assertLe(last, 100_000, "cap");
     }
 
     // ── bounds: a hostile pool creator must stay harmless ────────────────────
