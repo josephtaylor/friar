@@ -349,15 +349,35 @@ contract FriarV2Test is Test, Deployers {
 
     /// Several swaps inside one block: gap is 0 every time, so the EWMA is dragged down and
     /// the window must sit exactly on the floor rather than underflowing it.
+    ///
+    /// The window must be genuinely ELEVATED first or this proves nothing. The very first
+    /// observation is discarded by design (it is initialize-to-first-swap, not an
+    /// inter-swap gap), so one long-gap swap seeds the EWMA at the floor and a burst from
+    /// there would trivially "stay" on the floor.
     function test_sameBlockBurstPinsWindowToFloorNotBelow() public {
         PoolKey memory p = _freshPool(120);
-        vm.warp(block.timestamp + 600);
-        swap(p, true, -1e14, ZERO_BYTES); // seed with a long gap
 
-        for (uint256 i = 0; i < 100; i++) {
-            swap(p, i % 2 == 0, -1e14, ZERO_BYTES); // no warp: gap == 0
+        vm.warp(block.timestamp + 600);
+        swap(p, true, -1e14, ZERO_BYTES); // discarded seed: does NOT elevate anything
+
+        for (uint256 i = 0; i < 40; i++) {
+            vm.warp(block.timestamp + 300); // sustained sparse flow actually raises the EWMA
+            swap(p, i % 2 == 0, -1e14, ZERO_BYTES);
         }
-        assertEq(friar.filterWindow(p.toId()), _cfg().filterFloor, "same-block burst must land on the floor");
+        assertGt(friar.filterWindow(p.toId()), _cfg().filterFloor, "setup failed to elevate the window");
+
+        // Each zero-gap fold multiplies the EWMA by 31/32, so collapsing from a 300s EWMA
+        // to the floor takes ~142 swaps, not 100. Assert the floor holds at EVERY step, so
+        // this catches an underflow mid-collapse rather than only at the end.
+        uint16 prev = friar.filterWindow(p.toId());
+        for (uint256 i = 0; i < 250; i++) {
+            swap(p, i % 2 == 0, -1e14, ZERO_BYTES); // no warp: gap == 0
+            uint16 w = friar.filterWindow(p.toId());
+            assertGe(w, _cfg().filterFloor, "window underflowed the floor mid-collapse");
+            assertLe(w, prev, "zero-gap flow must never widen the window");
+            prev = w;
+        }
+        assertEq(prev, _cfg().filterFloor, "same-block burst must land on the floor");
     }
 
     /// The elevated tail both reviews flagged: longer windows mean the surge decays more
@@ -368,10 +388,21 @@ contract FriarV2Test is Test, Deployers {
         vm.warp(block.timestamp + 30);
         swap(p, true, -1e14, ZERO_BYTES);
 
-        // move price hard enough to light the surge
-        swap(p, true, -5e17, ZERO_BYTES);
-        uint256 start = block.timestamp;
+        // Move price hard enough to light the surge. The fee lags one swap, so the mover
+        // itself is priced off the pre-move tick and the displacement only shows up on the
+        // NEXT swap — which is why the surge has to be observed before timing its decay.
+        //
+        // Size deliberately: 5e17 moves only ~100 ticks against 1e20 of liquidity, under one
+        // 120-tick bucket, so it crosses a boundary only when the pool happens to sit near
+        // one. That makes the setup depend on price drift rather than on behaviour.
+        swap(p, true, -5e18, ZERO_BYTES);
 
+        vm.warp(block.timestamp + 30);
+        uint24 surged = _swapFeeOn(p, true);
+        assertGt(surged, BASE_FEE_PIPS, "setup failed to activate the surge; decay timing would be vacuous");
+        assertGt(friar.volatilityState(p.toId()).volatilityAccumulator, 0, "accumulator not armed");
+
+        uint256 start = block.timestamp;
         uint256 elapsed;
         for (uint256 i = 0; i < 400; i++) {
             vm.warp(block.timestamp + 30); // calm, regular flow
@@ -389,8 +420,12 @@ contract FriarV2Test is Test, Deployers {
     }
 
     function _swapFeeOn(PoolKey memory p, bool zeroForOne) internal returns (uint24) {
+        return _swapFeeOnSized(p, zeroForOne, -1e14);
+    }
+
+    function _swapFeeOnSized(PoolKey memory p, bool zeroForOne, int256 amount) internal returns (uint24) {
         vm.recordLogs();
-        swap(p, zeroForOne, -1e14, ZERO_BYTES);
+        swap(p, zeroForOne, amount, ZERO_BYTES);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = logs.length; i > 0; i--) {
             if (logs[i - 1].topics[0] == SWAP_TOPIC) {
@@ -415,14 +450,33 @@ contract FriarV2Test is Test, Deployers {
         }
         assertEq(friar.filterWindow(p.toId()), _cfg().filterCeil, "sustained silence should arm the ceiling");
 
-        // now a burst: gaps far below the window, so references persist and the surge builds
+        // Fees lag one swap: beforeSwap reads the tick as it stood BEFORE the swap, so a
+        // re-anchor always lands on the bucket price is already in. To observe the
+        // reference actually moving, price has to move in one swap and the re-anchor
+        // happen on the next.
+        // ~5e18 against 1e20 of liquidity moves roughly 1000 ticks, i.e. 8+ buckets at
+        // spacing 120. Sizing matters: 5e17 moves only ~100 ticks, which crosses a bucket
+        // boundary only if the pool happens to sit near one, so it would make this test
+        // pass or fail on where price drifted rather than on the behaviour under test.
+        int24 refBefore = friar.volatilityState(p.toId()).bucketReference;
+        swap(p, true, -5e18, ZERO_BYTES); // moves price several buckets; ref not yet updated
+        assertEq(friar.volatilityState(p.toId()).bucketReference, refBefore, "ref moves on the NEXT swap, not this one");
+
+        vm.warp(block.timestamp + 400); // > filterCeil, so the next swap re-anchors
+        swap(p, true, -1e14, ZERO_BYTES);
+        int24 refAfter = friar.volatilityState(p.toId()).bucketReference;
+        assertTrue(refAfter != refBefore, "long silence must re-anchor onto the moved bucket");
+
+        // Now burst in ONE direction at 1s gaps: far inside the long window, so no further
+        // re-anchor happens, delta grows every swap, and the surge must actually build.
         uint24 first = _swapFeeOn(p, true);
         uint24 last = first;
         for (uint256 i = 0; i < 10; i++) {
             vm.warp(block.timestamp + 1);
-            last = _swapFeeOn(p, i % 2 == 0);
+            last = _swapFeeOnSized(p, true, -1e18); // large enough to keep crossing buckets
         }
-        assertGe(last, first, "burst inside a long window should build the surge, not reset it");
+        assertGt(last, BASE_FEE_PIPS, "burst inside a long window must build a surge, not sit at base");
+        assertGt(last, first, "surge must grow across the burst");
         assertLe(last, 100_000, "cap");
     }
 

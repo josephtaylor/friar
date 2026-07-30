@@ -36,8 +36,8 @@ import {FriarMath} from "./FriarMath.sol";
 /// a dense pool (3.7s gaps) with the floor removed, whole-second timestamps let the EWMA
 /// collapse to zero, every swap re-anchored, and fee revenue HALVED versus the constant.
 /// With the floor in place the design degenerates to exactly v1 behaviour on dense flow
-/// and beats it by 8% (routed) to 36% (thin) elsewhere, while taking 1.75x to 31x longer
-/// to grind the fee back down to base.
+/// and beats it by +16% (routed) to +113% (thin) elsewhere, while taking 1.75x to 27x
+/// longer to grind the fee back down to base. Full numbers: docs/V2-MEASUREMENTS.md.
 ///
 /// Trust profile is unchanged from v1 and is the point of the whole design:
 /// - Permission bits: AFTER_INITIALIZE + BEFORE_SWAP only. The address proves this hook
@@ -87,9 +87,10 @@ contract FriarV2 is IHooks {
     /// traders (who can see it, since the v4 quoter simulates hooks) and helps LPs, and
     /// Meteora pools routinely run double-digit base fees on volatile launches. It is a
     /// different kind of thing from a hook that can seize principal, which this one
-    /// structurally cannot. Capping fees would restrict honest pools without preventing
-    /// the one real attack (a front-run config registration), which atomic
-    /// setPoolConfig+initialize is what actually defends against.
+    /// structurally cannot. Capping fees would also not have prevented the one real
+    /// attack here, a front-run config registration: that is defended against by keying
+    /// proposals to the registrant, so a pool adopts only the config of whoever
+    /// initializes it. See `setPoolConfig`.
     uint24 public constant MAX_BASE_FEE_PIPS = uint24(FriarMath.MAX_FEE_1E18 / 1e12);
     /// @dev Bound copied from LB's `setStaticFeeParameters` encoding.
     uint16 public constant MAX_DECAY_PERIOD = 4095;
