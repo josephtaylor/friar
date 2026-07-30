@@ -51,7 +51,7 @@ contract FriarV2GasTest is Test, Deployers {
                     decayPeriod: 600,
                     reductionFactor: 5000,
                     variableFeeControl: 40_000,
-                    maxVolatilityBps: 7000,
+                    maxVolatilityTicks: 7000,
                     locked: false
                 })
             ),

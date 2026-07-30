@@ -37,7 +37,7 @@ contract FriarV2Test is Test, Deployers {
             reductionFactor: 5000,
             variableFeeControl: 40_000,
             // saturate the surge at a 70% price move, whatever the bin width
-            maxVolatilityBps: 7000,
+            maxVolatilityTicks: 7000,
             locked: false
         });
     }
@@ -211,6 +211,106 @@ contract FriarV2Test is Test, Deployers {
         FriarV2.PoolConfig memory stored = friar.configOf(fresh.toId());
         assertEq(stored.baseFeePips, BASE_FEE_PIPS, "should fall back to the hook's defaults");
         assertTrue(stored.locked);
+    }
+
+    // ── review findings (2026-07-30 external review) ──────────────────────────
+
+    /// HIGH, from review: an earlier design keyed config proposals by pool alone, so a
+    /// searcher could run setPoolConfig + initialize ahead of the real creator and freeze
+    /// THEIR parameters onto the pool permanently. Atomicity does not fix that — the
+    /// attacker just executes the whole sequence first. Proposals are now keyed by
+    /// registrant, so an attacker's proposal cannot attach to someone else's initialize.
+    function test_attackerProposalCannotAttachToAnotherPartysPool() public {
+        PoolKey memory fresh = _unlockedKey(120);
+        address attacker = address(0xBAD);
+
+        FriarV2.PoolConfig memory hostile = _cfg();
+        hostile.baseFeePips = 100_000; // 10%, valid but ruinous for routing
+        vm.prank(attacker);
+        friar.setPoolConfig(fresh, hostile);
+
+        // the honest creator initializes without registering anything
+        manager.initialize(fresh, SQRT_PRICE_1_1);
+
+        FriarV2.PoolConfig memory live = friar.configOf(fresh.toId());
+        assertEq(live.baseFeePips, BASE_FEE_PIPS, "attacker's config must not attach");
+        assertTrue(live.locked);
+        // the attacker's proposal still exists, it just never applied
+        assertEq(friar.pendingConfigOf(fresh.toId(), attacker).baseFeePips, 100_000);
+    }
+
+    function test_registrantsOwnProposalIsTheOneAdopted() public {
+        PoolKey memory fresh = _unlockedKey(120);
+        FriarV2.PoolConfig memory mine = _cfg();
+        mine.baseFeePips = 5000;
+
+        vm.prank(address(0xBAD));
+        friar.setPoolConfig(fresh, _cfg()); // someone else's proposal, ignored
+
+        friar.setPoolConfig(fresh, mine);
+        manager.initialize(fresh, SQRT_PRICE_1_1); // this test contract is the initializer
+
+        assertEq(friar.configOf(fresh.toId()).baseFeePips, 5000, "initializer's own proposal wins");
+    }
+
+    /// MEDIUM, from review: the first observation is initialize-to-first-swap, not an
+    /// inter-swap gap. Seeding the EWMA with it let a pool created long before launch start
+    /// pinned at the ceiling for hundreds of swaps (~117 for a 1h first gap, ~217 for 1d).
+    function test_longIdleBeforeFirstSwapDoesNotPinTheWindowHigh() public {
+        PoolKey memory fresh = _unlockedKey(120);
+        friar.setPoolConfig(fresh, _cfg());
+        manager.initialize(fresh, SQRT_PRICE_1_1);
+        modifyLiquidityRouter.modifyLiquidity(
+            fresh, ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}), ZERO_BYTES
+        );
+
+        vm.warp(block.timestamp + 1 days); // pool sat idle between creation and launch
+        swap(fresh, true, -1e15, ZERO_BYTES);
+
+        assertEq(friar.filterWindow(fresh.toId()), _cfg().filterFloor, "first gap must not seed the window");
+    }
+
+    /// MEDIUM, from review: spacing-invariance holds only while the derived accumulator
+    /// fits in uint24. At very fine spacings it clamps. Documented rather than fixed —
+    /// raising it further would need a wider VolatilityState field.
+    function test_smallSpacingsClampAndLoseInvariance() public view {
+        uint24 cap = friar.MAX_VOLATILITY_ACCUMULATOR();
+        assertEq(friar.effectiveMaxVolatilityAccumulator(_unlockedKey(10)), 7_000_000, "10-tick still exact");
+        assertEq(friar.effectiveMaxVolatilityAccumulator(_unlockedKey(5)), 14_000_000, "5-tick still exact");
+        // 7000 * 10_000 / 4 = 17.5M > uint24 max, so it clamps and saturates early
+        assertEq(friar.effectiveMaxVolatilityAccumulator(_unlockedKey(4)), cap, "4-tick clamps");
+        assertEq(friar.effectiveMaxVolatilityAccumulator(_unlockedKey(1)), cap, "1-tick clamps hard");
+    }
+
+    /// The floor invariant must survive arbitrary registration, ordering and gap sequences,
+    /// not just the paths the other tests happen to walk.
+    function testFuzz_windowFloorHoldsAcrossArbitraryConfigsAndGaps(
+        uint16 floor_,
+        uint16 ceil_,
+        uint8 k,
+        uint16 gap,
+        uint8 nSwaps
+    ) public {
+        FriarV2.PoolConfig memory c = _cfg();
+        c.filterFloor = uint16(bound(floor_, friar.MIN_FILTER_FLOOR(), 600));
+        c.filterCeil = uint16(bound(ceil_, c.filterFloor, 600));
+        c.windowK = uint8(bound(k, friar.MIN_WINDOW_K(), friar.MAX_WINDOW_K()));
+
+        PoolKey memory fresh = _unlockedKey(120);
+        friar.setPoolConfig(fresh, c);
+        manager.initialize(fresh, SQRT_PRICE_1_1);
+        modifyLiquidityRouter.modifyLiquidity(
+            fresh, ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}), ZERO_BYTES
+        );
+
+        for (uint256 i = 0; i < bound(nSwaps, 1, 12); i++) {
+            vm.warp(block.timestamp + bound(gap, 0, 20_000));
+            swap(fresh, i % 2 == 0, -1e15, ZERO_BYTES);
+            uint16 w = friar.filterWindow(fresh.toId());
+            assertGe(w, friar.MIN_FILTER_FLOOR(), "floor invariant broken");
+            assertGe(w, c.filterFloor, "configured floor broken");
+            assertLe(w, c.filterCeil, "ceiling broken");
+        }
     }
 
     // ── bounds: a hostile pool creator must stay harmless ────────────────────

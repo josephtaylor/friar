@@ -53,6 +53,14 @@ import {FriarMath} from "./FriarMath.sol";
 ///   on this chain, whose `beforeRemoveLiquidity` reverts unconditionally — that traps
 ///   principal, which no fee level can do.
 ///
+/// KNOWN LIMITATION, accepted: the EWMA counts SWAPS, not economic volume, so dust flow
+/// can steer the window. Sustained dust drags it toward the floor and erases much of the
+/// adaptive uplift; an idle period arms a long one. Gas is ~$0.0003 a swap on this chain,
+/// so that steering is cheap. It cannot make the hook less safe than LB's constant, since
+/// the floor is a hard clamp and the constant IS the floor, but everything gained above
+/// the floor is manipulable by a determined party. Volume-weighting the EWMA would fix it
+/// and costs another storage word; revisit if a pool is observed being farmed this way.
+///
 /// Known deviation from Liquidity Book, inherited from v1 and unfixable inside v4: LB
 /// escalates the fee per bin crossed *within* a swap, whereas a v4 hook returns exactly
 /// one fee per swap, decided in `beforeSwap` from state as it stood before it. So a swap's
@@ -90,8 +98,10 @@ contract FriarV2 is IHooks {
     /// ceiling is widened to the full uint24 — otherwise fine-binned pools would hit the
     /// storage bound long before the volatility they actually configured.
     uint24 public constant MAX_VOLATILITY_ACCUMULATOR = type(uint24).max;
-    /// @dev Largest saturation point expressible, in bps of price movement (~167%).
-    uint24 public constant MAX_VOLATILITY_BPS = 16_700;
+    /// @dev Largest saturation point expressible, in TICKS of price displacement.
+    /// Ticks are logarithmic and asymmetric: 16_700 ticks is 1.0001^16700, about +431%
+    /// up or -81% down. Do not read these as linear percentages.
+    uint24 public constant MAX_VOLATILITY_TICKS = 16_700;
     /// @dev Window multiplier bounds. k must exceed 1 or a swap arriving at the typical
     /// gap would re-anchor every time, which is the degenerate case the floor guards.
     uint8 public constant MIN_WINDOW_K = 2;
@@ -110,12 +120,19 @@ contract FriarV2 is IHooks {
         uint16 decayPeriod; // LB decayPeriod
         uint16 reductionFactor; // LB reductionFactor, bps
         uint24 variableFeeControl; // LB variableFeeControl
-        // Price movement, in bps, at which the surge saturates. LB expresses this in BIN
-        // units, which silently makes surge behaviour depend on tick spacing: the stock
-        // 350_000 saturates at a 70% move on 200-tick bins but a 3.5% move on 10-tick
-        // bins. Specifying it as price and converting per pool makes it spacing-invariant,
-        // which is the whole point of decoupling fees from bin width.
-        uint24 maxVolatilityBps;
+        // Price displacement, in TICKS, at which the surge saturates. LB expresses this
+        // ceiling in BIN units, which silently makes surge behaviour depend on tick
+        // spacing: the stock 350_000 saturates 20x sooner on 10-tick bins than on
+        // 200-tick bins. Expressing it in ticks and converting per pool makes it
+        // spacing-invariant, which is the point of decoupling fees from bin width.
+        //
+        // Ticks are logarithmic, so this is NOT a symmetric percentage: 7_000 ticks is
+        // about +101% upward and -50% downward, not "70%".
+        //
+        // CAVEAT: the derived accumulator is uint24, so below roughly 5-tick spacing the
+        // conversion clamps and spacing-invariance stops holding. See
+        // test_smallSpacingsClampAndLoseInvariance.
+        uint24 maxVolatilityTicks;
         bool locked; // set true by afterInitialize; config is immutable thereafter
     }
 
@@ -125,11 +142,15 @@ contract FriarV2 is IHooks {
     PoolConfig public defaultConfig;
 
     mapping(PoolId => FriarMath.VolatilityState) internal _volatility;
+    /// @dev The frozen config, written once by `afterInitialize`.
     mapping(PoolId => PoolConfig) internal _config;
+    /// @dev Proposals, keyed by REGISTRANT as well as pool. A pool adopts the proposal made
+    /// by whoever actually initializes it, so nobody can impose a config on anybody else.
+    mapping(PoolId => mapping(address => PoolConfig)) internal _pending;
     /// @dev EWMA of inter-swap gaps, in seconds << GAP_SCALE_SHIFT.
     mapping(PoolId => uint32) internal _ewmaGap;
 
-    event PoolConfigured(PoolId indexed poolId, PoolConfig config);
+    event PoolConfigured(PoolId indexed poolId, address indexed registrant, PoolConfig config);
     event PoolConfigLocked(PoolId indexed poolId, PoolConfig config);
 
     constructor(IPoolManager _poolManager, PoolConfig memory _defaultConfig) {
@@ -166,18 +187,24 @@ contract FriarV2 is IHooks {
 
     // ─────────────────────────────────────────────────────────── configuration
 
-    /// @notice Register fee parameters for a pool that has not initialized yet.
+    /// @notice Propose fee parameters for a pool that has not initialized yet. The pool
+    /// adopts the proposal registered by WHOEVER INITIALIZES IT, so this is a proposal
+    /// under your own address, not a claim on the pool.
     ///
     /// v4 removed `hookData` from `initialize`, and `LPFeeLibrary.isDynamicFee` is a strict
-    /// `fee == DYNAMIC_FEE_FLAG`, so there is no room in the PoolKey to carry parameters.
-    /// Pre-registration is the only route left. Anyone may call this, and it may be
-    /// overwritten until the pool initializes, at which point it freezes forever.
+    /// `fee == DYNAMIC_FEE_FLAG`, so there is no room in the PoolKey to carry parameters
+    /// and pre-registration is the only route left.
     ///
-    /// The front-running window (someone registering unhelpful params just before your
-    /// initialize) is bounded two ways: every field is capped by the constants above, so
-    /// the worst case is suboptimal rather than punitive, and a creator who cares can call
-    /// this and `initialize` atomically in one transaction — which is what the position
-    /// manager's `openNew` should do.
+    /// Keying by registrant is what makes that safe. An earlier design keyed proposals by
+    /// pool alone, which meant a searcher could run `setPoolConfig` + `initialize` ahead of
+    /// you and permanently freeze THEIR parameters onto the pool you were creating —
+    /// atomicity does not help, because the attacker simply executes the whole sequence
+    /// first. Now the worst a front-runner achieves is creating the pool at a price of
+    /// their choosing under their own config, which is a property of permissionless
+    /// `PoolManager.initialize` that every v4 pool already has, hook or no hook.
+    ///
+    /// Callers must still verify the frozen config and the initial price before depositing
+    /// into a pool they did not create.
     function setPoolConfig(PoolKey calldata key, PoolConfig calldata cfg) external {
         PoolId poolId = key.toId();
         if (_config[poolId].locked) revert AlreadyLocked();
@@ -185,22 +212,28 @@ contract FriarV2 is IHooks {
 
         PoolConfig memory stored = cfg;
         stored.locked = false;
-        _config[poolId] = stored;
-        emit PoolConfigured(poolId, stored);
+        _pending[poolId][msg.sender] = stored;
+        emit PoolConfigured(poolId, msg.sender, stored);
     }
 
-    /// @notice The configuration a pool is using (or would use, if not yet initialized).
+    /// @notice The configuration a pool is using. Before initialization this is the
+    /// default, since which proposal wins is not known until someone initializes.
     function configOf(PoolId poolId) public view returns (PoolConfig memory cfg) {
         cfg = _config[poolId];
-        if (cfg.baseFeePips == 0 && !cfg.locked) cfg = defaultConfig;
+        if (!cfg.locked) cfg = defaultConfig;
+    }
+
+    /// @notice A specific registrant's pending proposal for a pool, if any.
+    function pendingConfigOf(PoolId poolId, address registrant) external view returns (PoolConfig memory) {
+        return _pending[poolId][registrant];
     }
 
     function _validate(PoolConfig memory c) internal pure {
         if (
             c.baseFeePips == 0 || c.baseFeePips > MAX_BASE_FEE_PIPS || c.filterFloor < MIN_FILTER_FLOOR
                 || c.filterCeil < c.filterFloor || c.decayPeriod > MAX_DECAY_PERIOD || c.filterCeil > c.decayPeriod
-                || c.reductionFactor > FriarMath.BASIS_POINT_MAX || c.maxVolatilityBps == 0
-                || c.maxVolatilityBps > MAX_VOLATILITY_BPS || c.windowK < MIN_WINDOW_K || c.windowK > MAX_WINDOW_K
+                || c.reductionFactor > FriarMath.BASIS_POINT_MAX || c.maxVolatilityTicks == 0
+                || c.maxVolatilityTicks > MAX_VOLATILITY_TICKS || c.windowK < MIN_WINDOW_K || c.windowK > MAX_WINDOW_K
         ) revert InvalidParameters();
     }
 
@@ -216,10 +249,15 @@ contract FriarV2 is IHooks {
     /// @dev Pure form, so the swap path can reuse the config and EWMA it has already read
     /// instead of paying for the same two slots twice.
     function _window(PoolConfig memory c, uint32 ewma) internal pure returns (uint16) {
-        if (ewma == 0) return c.filterFloor;
+        // Clamp locally rather than trusting the writer. Every path that can set a config
+        // today runs _validate, but this turns "all current writers preserve the floor"
+        // into "no writer can break it", which is the property the design actually rests on.
+        uint16 floor_ = c.filterFloor < MIN_FILTER_FLOOR ? MIN_FILTER_FLOOR : c.filterFloor;
+        uint16 ceil_ = c.filterCeil < floor_ ? floor_ : c.filterCeil;
+        if (ewma == 0) return floor_;
         uint256 w = (uint256(c.windowK) * ewma) >> GAP_SCALE_SHIFT;
-        if (w < c.filterFloor) return c.filterFloor;
-        if (w > c.filterCeil) return c.filterCeil;
+        if (w < floor_) return floor_;
+        if (w > ceil_) return ceil_;
         return uint16(w);
     }
 
@@ -238,8 +276,8 @@ contract FriarV2 is IHooks {
         pure
         returns (FriarMath.Params memory)
     {
-        // bins = bps / binStep, and the accumulator counts bins x BASIS_POINT_MAX
-        uint256 maxVa = (uint256(c.maxVolatilityBps) * FriarMath.BASIS_POINT_MAX) / binStep;
+        // bins = ticks / binStep, and the accumulator counts bins x BASIS_POINT_MAX
+        uint256 maxVa = (uint256(c.maxVolatilityTicks) * FriarMath.BASIS_POINT_MAX) / binStep;
         if (maxVa > MAX_VOLATILITY_ACCUMULATOR) maxVa = MAX_VOLATILITY_ACCUMULATOR;
         return FriarMath.Params({
             baseFactor: 0,
@@ -264,10 +302,17 @@ contract FriarV2 is IHooks {
 
     /// @dev EWMA update: `ewma += (gap - ewma) >> 5`, gaps scaled by 256. Integer-only.
     /// Takes `prev` rather than re-reading it, so the swap path pays for one read.
-    function _foldGap(uint32 prev, uint256 gapSeconds) internal pure returns (uint32) {
+    ///
+    /// The first observation is deliberately DISCARDED. It is not an inter-swap gap, it is
+    /// initialize-to-first-swap, and a pool created long before its launch would otherwise
+    /// seed the EWMA at the ceiling. Because descending from a huge seed takes far longer
+    /// than the ~22-swap half-life suggests (a 1-hour first gap needs ~117 swaps to fall
+    /// below the ceiling, a 1-day gap ~217), the seed is set so the window starts at
+    /// exactly `filterFloor` and the SECOND swap supplies the first real gap.
+    function _foldGap(PoolConfig memory c, uint32 prev, uint256 gapSeconds) internal pure returns (uint32) {
+        if (prev == 0) return uint32((uint256(c.filterFloor) << GAP_SCALE_SHIFT) / c.windowK);
         uint256 scaled = gapSeconds << GAP_SCALE_SHIFT;
         if (scaled > type(uint32).max) scaled = type(uint32).max;
-        if (prev == 0) return uint32(scaled);
         if (scaled >= prev) return uint32(prev + ((scaled - prev) >> EWMA_SHIFT));
         return uint32(prev - ((prev - scaled) >> EWMA_SHIFT));
     }
@@ -287,7 +332,7 @@ contract FriarV2 is IHooks {
 
     // ───────────────────────────────────────────────────────────────── hooks
 
-    function afterInitialize(address, PoolKey calldata key, uint160, int24 tick)
+    function afterInitialize(address sender, PoolKey calldata key, uint160, int24 tick)
         external
         onlyPoolManager
         returns (bytes4)
@@ -295,8 +340,12 @@ contract FriarV2 is IHooks {
         if (!key.fee.isDynamicFee()) revert NotDynamicFeePool();
         PoolId poolId = key.toId();
 
-        PoolConfig memory c = configOf(poolId);
-        // freeze whatever the pool ended up with, defaults included
+        // Adopt the initializer's own proposal, or the defaults. Re-validated here as
+        // defence in depth: this is the single place a config becomes permanent, and the
+        // floor invariant is load-bearing enough to be worth paying for once per pool.
+        PoolConfig memory c = _pending[poolId][sender];
+        if (c.baseFeePips == 0) c = defaultConfig;
+        _validate(c);
         c.locked = true;
         _config[poolId] = c;
 
@@ -340,7 +389,7 @@ contract FriarV2 is IHooks {
             vol.update(p, FriarMath.bucketOf(tick, key.tickSpacing), block.timestamp);
         }
         _volatility[poolId] = vol;
-        _ewmaGap[poolId] = _foldGap(ewma, gap);
+        _ewmaGap[poolId] = _foldGap(c, ewma, gap);
 
         return _feeFor(c, p, vol.volatilityAccumulator, binStep);
     }
@@ -356,7 +405,7 @@ contract FriarV2 is IHooks {
     }
 
     /// @notice The accumulator ceiling this pool actually uses, derived from its
-    /// configured `maxVolatilityBps` at its own bin width. Exposed because off-chain
+    /// configured `maxVolatilityTicks` at its own bin width. Exposed because off-chain
     /// quoting and the fee harness need the same number the hook uses, and because it is
     /// the value that shows the saturation point is now spacing-invariant.
     function effectiveMaxVolatilityAccumulator(PoolKey calldata key) external view returns (uint24) {

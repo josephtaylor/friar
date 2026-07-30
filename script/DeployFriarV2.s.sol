@@ -40,10 +40,12 @@ import {FriarV2} from "../src/FriarV2.sol";
 ///     pinning the fee HIGH costs an attacker more per hour than the pool's entire
 ///     turnover, so neither direction is economic.
 ///
-///   MAX_VOLATILITY_BPS 7000. The surge saturates at a 70% price move REGARDLESS of bin
-///     width. LB expresses this ceiling in bin units, which silently makes it 70% on
-///     200-tick bins but 3.5% on 10-tick bins. Meteora migrants run bin step 100-150, so
-///     spacing-invariance here is load-bearing, not cosmetic.
+///   MAX_VOLATILITY_TICKS 7000. The surge saturates at 7000 ticks of price displacement
+///     regardless of bin width. Ticks are logarithmic, so that is roughly +101% up and
+///     -50% down, NOT a symmetric 70%. LB expresses this ceiling in bin units, which
+///     silently makes it fire 20x sooner on 10-tick bins than on 200-tick ones. Meteora
+///     migrants run bin step 100-150, so spacing-invariance is load-bearing here. Below
+///     about 5-tick spacing the uint24 accumulator clamps and invariance stops holding.
 contract DeployFriarV2 is Script {
     address constant CREATE2_DEPLOYER = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
     // Uniswap v4 PoolManager on Robinhood Chain (4663):
@@ -59,7 +61,7 @@ contract DeployFriarV2 is Script {
             decayPeriod: uint16(vm.envOr("DECAY_PERIOD", uint256(600))),
             reductionFactor: uint16(vm.envOr("REDUCTION_FACTOR", uint256(5000))),
             variableFeeControl: uint24(vm.envOr("VARIABLE_FEE_CONTROL", uint256(40_000))),
-            maxVolatilityBps: uint24(vm.envOr("MAX_VOLATILITY_BPS", uint256(7000))),
+            maxVolatilityTicks: uint24(vm.envOr("MAX_VOLATILITY_TICKS", uint256(7000))),
             locked: false
         });
 
@@ -86,6 +88,6 @@ contract DeployFriarV2 is Script {
         console2.log("  decayPeriod:", cfg.decayPeriod);
         console2.log("  reductionFactor:", cfg.reductionFactor);
         console2.log("  variableFeeControl:", cfg.variableFeeControl);
-        console2.log("  maxVolatilityBps:", cfg.maxVolatilityBps);
+        console2.log("  maxVolatilityTicks:", cfg.maxVolatilityTicks);
     }
 }
