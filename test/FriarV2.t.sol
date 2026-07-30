@@ -1,0 +1,280 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {Deployers} from "v4-core/test/utils/Deployers.sol";
+import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+import {Hooks} from "v4-core/src/libraries/Hooks.sol";
+import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
+import {PoolKey} from "v4-core/src/types/PoolKey.sol";
+import {PoolId} from "v4-core/src/types/PoolId.sol";
+import {ModifyLiquidityParams} from "v4-core/src/types/PoolOperation.sol";
+
+import {FriarV2} from "../src/FriarV2.sol";
+
+/// Tests concentrate on the two things that make V2 different from V1, plus the bounds
+/// that keep a hostile pool creator harmless. The LB core itself is unchanged and is
+/// already covered by FriarMath.t.sol.
+contract FriarV2Test is Test, Deployers {
+    bytes32 constant SWAP_TOPIC = keccak256("Swap(bytes32,address,int128,int128,uint160,uint128,int24,uint24)");
+
+    int24 constant TICK_SPACING = 150; // Meteora migrants run bin step 100-150
+    // 0.90%, independent of tick spacing. This is the shipping default: the surge adds a
+    // base-independent ~12bps on routed flow, so break-even against a static 1% pool is a
+    // 0.878% base. Below that the pool earns less than the static competitor it replaces.
+    uint24 constant BASE_FEE_PIPS = 9000;
+
+    FriarV2 friar;
+
+    function _cfg() internal pure returns (FriarV2.PoolConfig memory) {
+        return FriarV2.PoolConfig({
+            baseFeePips: BASE_FEE_PIPS,
+            filterFloor: 10, // == MIN_FILTER_FLOOR: degenerates to LB on dense flow
+            filterCeil: 300,
+            windowK: 3,
+            decayPeriod: 600,
+            reductionFactor: 5000,
+            variableFeeControl: 40_000,
+            // saturate the surge at a 70% price move, whatever the bin width
+            maxVolatilityBps: 7000,
+            locked: false
+        });
+    }
+
+    function setUp() public {
+        deployFreshManagerAndRouters();
+        deployMintAndApprove2Currencies();
+
+        address flags = address(uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG));
+        deployCodeTo("FriarV2.sol:FriarV2", abi.encode(manager, _cfg()), flags);
+        friar = FriarV2(flags);
+
+        (key,) = initPool(
+            currency0, currency1, IHooks(address(friar)), LPFeeLibrary.DYNAMIC_FEE_FLAG, TICK_SPACING, SQRT_PRICE_1_1
+        );
+        modifyLiquidityRouter.modifyLiquidity(
+            key, ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}), ZERO_BYTES
+        );
+    }
+
+    /// A PoolKey that has not been initialized, so config is still writable. Bounds tests
+    /// must use this: `key` is live from setUp, so it would revert AlreadyLocked before
+    /// validation ever runs.
+    function _unlockedKey(int24 spacing) internal view returns (PoolKey memory) {
+        return PoolKey({
+            currency0: currency0,
+            currency1: currency1,
+            fee: LPFeeLibrary.DYNAMIC_FEE_FLAG,
+            tickSpacing: spacing,
+            hooks: IHooks(address(friar))
+        });
+    }
+
+    function _swapAndGetFee(bool zeroForOne, int256 amountSpecified) internal returns (uint24 fee) {
+        vm.recordLogs();
+        swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = logs.length; i > 0; i--) {
+            if (logs[i - 1].topics[0] == SWAP_TOPIC) {
+                (,,,,, uint24 f) = abi.decode(logs[i - 1].data, (int128, int128, uint160, uint128, int24, uint24));
+                return f;
+            }
+        }
+        revert("no Swap event");
+    }
+
+    // ── the safety property ──────────────────────────────────────────────────
+    // Measured on dense (3.7s-gap) flow: with no floor, whole-second timestamps let the
+    // EWMA collapse, every swap re-anchors, and fee revenue halves versus LB's constant.
+    // The floor is what makes adaptivity one-way. It must be unrepresentable to go below.
+
+    function test_filterFloorBelowLBConstantIsRejected() public {
+        FriarV2.PoolConfig memory c = _cfg();
+        c.filterFloor = friar.MIN_FILTER_FLOOR() - 1;
+        vm.expectRevert(FriarV2.InvalidParameters.selector);
+        friar.setPoolConfig(_unlockedKey(80), c);
+    }
+
+    function testFuzz_windowNeverBelowFloor(uint32 gapSeconds) public {
+        gapSeconds = uint32(bound(gapSeconds, 0, 100_000));
+        PoolId id = key.toId();
+        for (uint256 i = 0; i < 5; i++) {
+            vm.warp(block.timestamp + gapSeconds);
+            _swapAndGetFee(i % 2 == 0, -1e15);
+            assertGe(friar.filterWindow(id), _cfg().filterFloor, "window dipped below floor");
+            assertLe(friar.filterWindow(id), _cfg().filterCeil, "window exceeded ceiling");
+        }
+    }
+
+    // ── adaptivity actually adapts ───────────────────────────────────────────
+
+    function test_windowWidensOnSparseFlowAndFloorsOnDenseFlow() public {
+        PoolId id = key.toId();
+        assertEq(friar.filterWindow(id), 10, "cold start should sit at the floor");
+
+        // sparse flow: 120s between swaps -> EWMA climbs -> window opens past the floor
+        for (uint256 i = 0; i < 60; i++) {
+            vm.warp(block.timestamp + 120);
+            _swapAndGetFee(i % 2 == 0, -1e15);
+        }
+        uint16 sparseWindow = friar.filterWindow(id);
+        assertGt(sparseWindow, 10, "sparse flow should widen the window past the floor");
+
+        // dense flow: same-second swaps -> EWMA decays -> window returns to the floor
+        for (uint256 i = 0; i < 200; i++) {
+            _swapAndGetFee(i % 2 == 0, -1e15);
+        }
+        assertEq(friar.filterWindow(id), 10, "dense flow should collapse back to the floor, not below");
+    }
+
+    // ── base fee is decoupled from tick spacing ──────────────────────────────
+
+    function test_sameBaseFeeAcrossDifferentTickSpacings() public {
+        // V1's base fee was baseFactor x tickSpacing, so changing spacing changed the fee.
+        // Here the same baseFeePips must survive a 10x change in bin width.
+        (PoolKey memory wide,) = initPool(
+            currency0, currency1, IHooks(address(friar)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 600, SQRT_PRICE_1_1
+        );
+        modifyLiquidityRouter.modifyLiquidity(
+            wide, ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}), ZERO_BYTES
+        );
+
+        uint24 narrowFee = _swapAndGetFee(true, -1e15);
+
+        vm.recordLogs();
+        swap(wide, true, -1e15, ZERO_BYTES);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        uint24 wideFee;
+        for (uint256 i = logs.length; i > 0; i--) {
+            if (logs[i - 1].topics[0] == SWAP_TOPIC) {
+                (,,,,, wideFee) = abi.decode(logs[i - 1].data, (int128, int128, uint160, uint128, int24, uint24));
+                break;
+            }
+        }
+        assertEq(narrowFee, BASE_FEE_PIPS, "narrow pool should charge exactly the configured base");
+        assertEq(wideFee, BASE_FEE_PIPS, "wide pool should charge the same base despite 10x bin width");
+    }
+
+    /// The surge saturation point must be a PRICE move, not a bin count. LB's stock
+    /// maxVolatilityAccumulator of 350_000 saturates at a 70% move on 200-tick bins but a
+    /// 3.5% move on 10-tick bins — same config, 20x different behaviour, worst exactly
+    /// where you want fine bins for concentration.
+    function test_surgeSaturationIsSpacingInvariant() public view {
+        uint24 coarse = friar.effectiveMaxVolatilityAccumulator(_unlockedKey(200));
+        uint24 fine = friar.effectiveMaxVolatilityAccumulator(_unlockedKey(10));
+
+        // 7000bps / 200 = 35 bins, x BASIS_POINT_MAX -> the historical LB value
+        assertEq(coarse, 350_000, "200-tick pool should reproduce LB's stock ceiling");
+        // 7000bps / 10 = 700 bins -> 20x the accumulator for the same 70% price move
+        assertEq(fine, 7_000_000, "10-tick pool needs 20x the accumulator for the same move");
+        assertEq(uint256(fine) * 10, uint256(coarse) * 200, "same price move, both spacings");
+    }
+
+    // ── config lifecycle ─────────────────────────────────────────────────────
+
+    function test_configFreezesAtInitialize() public {
+        FriarV2.PoolConfig memory c = _cfg();
+        c.baseFeePips = 5000;
+        vm.expectRevert(FriarV2.AlreadyLocked.selector);
+        friar.setPoolConfig(key, c);
+    }
+
+    function test_uninitializedPoolTakesRegisteredConfigThenLocksIt() public {
+        PoolKey memory fresh = PoolKey({
+            currency0: currency0,
+            currency1: currency1,
+            fee: LPFeeLibrary.DYNAMIC_FEE_FLAG,
+            tickSpacing: 120,
+            hooks: IHooks(address(friar))
+        });
+        FriarV2.PoolConfig memory c = _cfg();
+        c.baseFeePips = 8000; // 0.80%
+        friar.setPoolConfig(fresh, c);
+
+        manager.initialize(fresh, SQRT_PRICE_1_1);
+
+        FriarV2.PoolConfig memory stored = friar.configOf(fresh.toId());
+        assertEq(stored.baseFeePips, 8000, "registered config should survive initialize");
+        assertTrue(stored.locked, "config should be frozen once the pool exists");
+    }
+
+    function test_poolWithNoRegisteredConfigUsesDefaults() public {
+        PoolKey memory fresh = PoolKey({
+            currency0: currency0,
+            currency1: currency1,
+            fee: LPFeeLibrary.DYNAMIC_FEE_FLAG,
+            tickSpacing: 200,
+            hooks: IHooks(address(friar))
+        });
+        manager.initialize(fresh, SQRT_PRICE_1_1);
+        FriarV2.PoolConfig memory stored = friar.configOf(fresh.toId());
+        assertEq(stored.baseFeePips, BASE_FEE_PIPS, "should fall back to the hook's defaults");
+        assertTrue(stored.locked);
+    }
+
+    // ── bounds: a hostile pool creator must stay harmless ────────────────────
+
+    /// Fees are capped only by LB's own 10% ceiling, on purpose. Anything at or under it
+    /// is a legitimate market choice (Meteora launch pools run double-digit base fees).
+    function test_rejectsBaseFeeAboveTheLBCeiling() public {
+        FriarV2.PoolConfig memory c = _cfg();
+        c.baseFeePips = friar.MAX_BASE_FEE_PIPS() + 1;
+        vm.expectRevert(FriarV2.InvalidParameters.selector);
+        friar.setPoolConfig(_unlockedKey(80), c);
+    }
+
+    /// Regression: routing the base through LB's uint16 `baseFactor` silently capped the
+    /// achievable fee at ~0.66% for 10-tick bins, which defeated the whole decoupling.
+    /// A 10% base must work at the finest spacing.
+    function test_maxBaseFeeWorksAtFineTickSpacing() public {
+        PoolKey memory fine = _unlockedKey(10);
+        FriarV2.PoolConfig memory c = _cfg();
+        c.baseFeePips = friar.MAX_BASE_FEE_PIPS(); // 10%
+        friar.setPoolConfig(fine, c);
+        manager.initialize(fine, SQRT_PRICE_1_1);
+        modifyLiquidityRouter.modifyLiquidity(
+            fine, ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}), ZERO_BYTES
+        );
+
+        vm.recordLogs();
+        swap(fine, true, -1e15, ZERO_BYTES);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        uint24 fee;
+        for (uint256 i = logs.length; i > 0; i--) {
+            if (logs[i - 1].topics[0] == SWAP_TOPIC) {
+                (,,,,, fee) = abi.decode(logs[i - 1].data, (int128, int128, uint160, uint128, int24, uint24));
+                break;
+            }
+        }
+        assertEq(fee, 100_000, "10% base must be expressible on 10-tick bins");
+    }
+
+    function test_rejectsWindowKOutOfRange() public {
+        FriarV2.PoolConfig memory c = _cfg();
+        c.windowK = friar.MIN_WINDOW_K() - 1;
+        vm.expectRevert(FriarV2.InvalidParameters.selector);
+        friar.setPoolConfig(_unlockedKey(80), c);
+
+        c.windowK = friar.MAX_WINDOW_K() + 1;
+        vm.expectRevert(FriarV2.InvalidParameters.selector);
+        friar.setPoolConfig(_unlockedKey(80), c);
+    }
+
+    function test_rejectsCeilingAboveDecayPeriod() public {
+        FriarV2.PoolConfig memory c = _cfg();
+        c.filterCeil = c.decayPeriod + 1;
+        vm.expectRevert(FriarV2.InvalidParameters.selector);
+        friar.setPoolConfig(_unlockedKey(80), c);
+    }
+
+    function testFuzz_feeNeverExceedsLBCap(uint8 swaps, uint16 gap) public {
+        swaps = uint8(bound(swaps, 1, 40));
+        for (uint256 i = 0; i < swaps; i++) {
+            vm.warp(block.timestamp + bound(gap, 0, 1000));
+            uint24 fee = _swapAndGetFee(i % 2 == 0, -1e15);
+            assertLe(fee, 100_000, "fee exceeded the LB 10% cap");
+            assertGe(fee, BASE_FEE_PIPS, "fee fell below the configured base");
+        }
+    }
+}
