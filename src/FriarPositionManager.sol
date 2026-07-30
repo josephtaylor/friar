@@ -11,6 +11,7 @@ import {CurrencySettler} from "./CurrencySettler.sol";
 import {TransientStateLibrary} from "v4-core/src/libraries/TransientStateLibrary.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {ModifyLiquidityParams, SwapParams} from "v4-core/src/types/PoolOperation.sol";
+import {IConfigurableFeeHook} from "./interfaces/IConfigurableFeeHook.sol";
 
 /// @notice Multi-tenant position manager: opens/closes a whole Position (N bins) as one
 /// atomic unit inside a single PoolManager unlock. Anyone may open; only the position
@@ -239,6 +240,37 @@ contract FriarPositionManager is IUnlockCallback {
         uint256 maxPay0,
         uint256 maxPay1
     ) external returns (uint256 positionId) {
+        manager.initialize(key, sqrtPriceX96);
+        return _open(key, bins, swapIn, maxPay0, maxPay1);
+    }
+
+    /// @notice Create a pool with NON-DEFAULT hook parameters and open a position in it,
+    /// in one transaction.
+    ///
+    /// Needed because hooks with per-pool parameters (v4 has no `hookData` at initialize)
+    /// key their proposals by registrant, and for a manager-created pool the registrant is
+    /// THIS CONTRACT, not the caller. A user who registers a config from their own wallet
+    /// and then calls `openNew` would silently get hook defaults. See
+    /// `IConfigurableFeeHook`.
+    ///
+    /// The hook call is typed, not raw calldata: this contract holds user approvals, so an
+    /// arbitrary-call primitive is not worth the flexibility. A hook that does not
+    /// implement the exact signature makes this revert, which is the safe failure.
+    ///
+    /// This does not make you the pool's creator in any privileged sense. Nothing can:
+    /// `PoolManager.initialize` is permissionless, so somebody may always initialize a
+    /// given PoolKey before you, at a price and config of their choosing. If that has
+    /// happened this call reverts on `initialize` and no funds move.
+    function openNewConfigured(
+        PoolKey calldata key,
+        uint160 sqrtPriceX96,
+        IConfigurableFeeHook.PoolConfig calldata cfg,
+        Bin[] calldata bins,
+        SwapIn calldata swapIn,
+        uint256 maxPay0,
+        uint256 maxPay1
+    ) external returns (uint256 positionId) {
+        IConfigurableFeeHook(address(key.hooks)).setPoolConfig(key, cfg);
         manager.initialize(key, sqrtPriceX96);
         return _open(key, bins, swapIn, maxPay0, maxPay1);
     }

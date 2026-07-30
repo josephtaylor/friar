@@ -15,21 +15,32 @@ import {FriarPositionManager} from "../src/FriarPositionManager.sol";
 ///     --broadcast --account tuck-deployer
 ///
 /// Overrides:
-///   PERF_FEE_BPS     shaped (multi-bin) fee share in bps (default 1000 = 10%, hard cap 2000)
-///   SIMPLE_FEE_BPS   simple (single-bin) fee share in bps (default 100 = 1%, hard cap 2000)
+///   PERF_FEE_BPS     shaped (multi-bin) fee share in bps (default 500 = 5%, hard cap 2000)
+///   SIMPLE_FEE_BPS   simple (single-bin) fee share in bps (default 500 = 5%, hard cap 2000)
+///
+///   Both default to 500 because the tiering is being retired. Measured over 21 real
+///   positions the blended take was 6.0% (44% of the fee base ran through the 1% simple
+///   tier), and the tiers showed no yield difference once controlled for time — so
+///   charging 10x more for one of them was not defensible, and the split mostly taught
+///   users to optimise `bins.length` against us. Flat 5% is roughly revenue-neutral
+///   against the measured blend, sits under SectorOne's measured ~8%, and matches the 5%
+///   Ramses advertises.
 ///   TREASURY     fee recipient        (default: the broadcasting sender)
 ///   PERF_FEE_EXEMPT  house bot        (default: the broadcasting sender)
 ///   STARTING_POSITION_ID  first id this deployment mints (default 1). On a REDEPLOY set
 ///     this above the previous manager's highest id — off-chain history is keyed by id,
-///     so restarting at 1 would collide with and clobber the old records.
+///     so restarting at 1 would collide with and clobber the old records. The live
+///     manager's `nextPositionId()` was 23 on 2026-07-30; use 101 so the generation is
+///     obvious at a glance AND so a straggler open against the retired manager cannot
+///     collide with an id this one has already minted.
 contract DeployFriarPositionManager is Script {
     // Uniswap v4 PoolManager on Robinhood Chain (4663):
     // https://developers.uniswap.org/contracts/v4/deployments
     address constant POOL_MANAGER = 0x8366a39CC670B4001A1121B8F6A443A643e40951;
 
     function run() external {
-        uint16 perfFeeBps = uint16(vm.envOr("PERF_FEE_BPS", uint256(1000)));
-        uint16 simpleFeeBps = uint16(vm.envOr("SIMPLE_FEE_BPS", uint256(100)));
+        uint16 perfFeeBps = uint16(vm.envOr("PERF_FEE_BPS", uint256(500)));
+        uint16 simpleFeeBps = uint16(vm.envOr("SIMPLE_FEE_BPS", uint256(500)));
         uint256 startingPositionId = vm.envOr("STARTING_POSITION_ID", uint256(1));
 
         vm.startBroadcast();
