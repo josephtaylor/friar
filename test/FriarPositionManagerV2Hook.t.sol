@@ -10,6 +10,7 @@ import {Currency} from "v4-core/src/types/Currency.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {ModifyLiquidityParams} from "v4-core/src/types/PoolOperation.sol";
 import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
+import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 
 import {FriarV2} from "../src/FriarV2.sol";
 import {FriarPositionManager} from "../src/FriarPositionManager.sol";
@@ -25,6 +26,7 @@ contract FriarPositionManagerV2HookTest is Test, Deployers {
     address alice = address(0xA11CE);
     address treasury = address(0x7EA);
     address bot = address(0xB07);
+    address bob = address(0xB0B);
 
     int24 constant SPACING = 120;
     uint24 constant DEFAULT_BASE = 9000; // 0.90%, the shipping default
@@ -143,24 +145,70 @@ contract FriarPositionManagerV2HookTest is Test, Deployers {
             DEFAULT_BASE,
             "pool must take defaults: alice's proposal was not the initializer's"
         );
-        // and alice's proposal still sits there unused, which is why the app must use
-        // openNewConfigured rather than asking users to pre-register
-        assertEq(friar.pendingConfigOf(k.toId(), alice).baseFeePips, CUSTOM_BASE);
+        // alice's proposal is dead and reports empty now the pool is locked, which is the
+        // point of openNewConfigured: pre-registering from your own wallet does nothing
+        assertEq(friar.pendingConfigOf(k.toId(), alice).baseFeePips, 0, "dead proposals must report empty");
     }
 
     /// Permissionless initialize means someone can always get there first. The manager must
     /// fail cleanly and move no funds, rather than opening into a pool it did not configure.
+    ///
+    /// The revert comes from setPoolConfig, NOT initialize: the winner's afterInitialize
+    /// already froze the config, so the write is rejected before initialize is reached.
+    /// Asserted specifically, because a bare expectRevert would pass on any failure and
+    /// tell us nothing about where the guard actually lives.
     function test_openNewConfiguredRevertsIfSomeoneInitializedFirst() public {
         PoolKey memory k = _freshKey(SPACING);
         manager.initialize(k, SQRT_PRICE_1_1); // a searcher gets there first
 
         uint256 balBefore = MockERC20(Currency.unwrap(currency0)).balanceOf(alice);
         vm.prank(alice);
-        vm.expectRevert();
+        vm.expectRevert(FriarV2.AlreadyLocked.selector);
         fpm.openNewConfigured(
             k, SQRT_PRICE_1_1, _cfg(CUSTOM_BASE), _bins(), _noSwap(), type(uint256).max, type(uint256).max
         );
         assertEq(MockERC20(Currency.unwrap(currency0)).balanceOf(alice), balBefore, "no funds may move on a lost race");
+    }
+
+    /// THE load-bearing property of the shared manager registrant. All users share
+    /// _pending[poolId][manager], which is only safe because register + initialize + open
+    /// are one atomic transaction. If a later step fails, the whole lifecycle must roll
+    /// back — otherwise a failed open would leave a manager proposal, or worse an
+    /// initialized pool, that a subsequent caller inherits.
+    function test_failedOpenRollsBackTheEntireLifecycle() public {
+        PoolKey memory k = _freshKey(SPACING);
+
+        // maxPay 0 makes _open revert AFTER setPoolConfig and initialize have both succeeded
+        vm.prank(alice);
+        vm.expectRevert();
+        fpm.openNewConfigured(k, SQRT_PRICE_1_1, _cfg(CUSTOM_BASE), _bins(), _noSwap(), 0, 0);
+
+        (uint160 sqrtPrice,,,) = StateLibrary.getSlot0(manager, k.toId());
+        assertEq(sqrtPrice, 0, "pool must remain uninitialized");
+        assertEq(friar.pendingConfigOf(k.toId(), address(fpm)).baseFeePips, 0, "manager proposal must not survive");
+        assertFalse(friar.configOf(k.toId()).locked, "nothing may be frozen");
+
+        // and the PoolKey is genuinely still free: bob can take it with his own config
+        vm.prank(bob);
+        friar.setPoolConfig(k, _hookCfg(5000));
+        vm.prank(bob);
+        manager.initialize(k, SQRT_PRICE_1_1);
+        assertEq(friar.configOf(k.toId()).baseFeePips, 5000, "bob must be able to claim the freed key");
+    }
+
+    /// The manager's proposal must not attach when somebody else does the initializing.
+    function test_managerProposalCannotAttachToAnEOAInitialize() public {
+        PoolKey memory k = _freshKey(SPACING);
+
+        // strand a manager proposal by failing the open
+        vm.prank(alice);
+        vm.expectRevert();
+        fpm.openNewConfigured(k, SQRT_PRICE_1_1, _cfg(CUSTOM_BASE), _bins(), _noSwap(), 0, 0);
+
+        // even if one had survived, an EOA initializing takes its own/defaults
+        vm.prank(bob);
+        manager.initialize(k, SQRT_PRICE_1_1);
+        assertEq(friar.configOf(k.toId()).baseFeePips, DEFAULT_BASE, "bob must get defaults, not a manager proposal");
     }
 
     /// Flat 5% both tiers: a single-bin and a multi-bin position must be charged the same

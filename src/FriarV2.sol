@@ -225,7 +225,14 @@ contract FriarV2 is IHooks {
     }
 
     /// @notice A specific registrant's pending proposal for a pool, if any.
-    function pendingConfigOf(PoolId poolId, address registrant) external view returns (PoolConfig memory) {
+    ///
+    /// Returns empty once the pool is locked. Adopted and losing proposals both stay in
+    /// storage forever (losing ones cannot be enumerated, so they cannot be swept), but a
+    /// getter that keeps reporting them after the pool has frozen reads as though they
+    /// could still be adopted. They cannot: `setPoolConfig` is globally blocked once
+    /// `_config[poolId].locked`, so every proposal is dead the moment the pool exists.
+    function pendingConfigOf(PoolId poolId, address registrant) external view returns (PoolConfig memory empty) {
+        if (_config[poolId].locked) return empty;
         return _pending[poolId][registrant];
     }
 

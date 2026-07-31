@@ -38,6 +38,7 @@ contract FriarPositionManager is IUnlockCallback {
     error NotPositionOwner();
     error UnknownPosition();
     error NativeCurrencyUnsupported();
+    error HookConfigNotApplied();
     error VenueMismatch();
     error InvalidBins();
     error LengthMismatch();
@@ -254,13 +255,22 @@ contract FriarPositionManager is IUnlockCallback {
     /// `IConfigurableFeeHook`.
     ///
     /// The hook call is typed, not raw calldata: this contract holds user approvals, so an
-    /// arbitrary-call primitive is not worth the flexibility. A hook that does not
-    /// implement the exact signature makes this revert, which is the safe failure.
+    /// arbitrary-call primitive is not worth the flexibility.
+    ///
+    /// ABI COMPATIBILITY IS NOT SEMANTIC COMPATIBILITY. A hook matching this signature only
+    /// proves it can RECEIVE the call, not that it honoured it — a different hook may
+    /// accept the config and ignore it, or adopt it under different rules. So the frozen
+    /// config is read back after initialization and compared, which catches an honest
+    /// mismatch. It does NOT defend against a hook that lies in `configOf` as well; a
+    /// caller who has chosen to supply a hostile hook is outside this contract's
+    /// guarantees either way, and their exposure is bounded by `maxPay0/1`.
     ///
     /// This does not make you the pool's creator in any privileged sense. Nothing can:
     /// `PoolManager.initialize` is permissionless, so somebody may always initialize a
     /// given PoolKey before you, at a price and config of their choosing. If that has
-    /// happened this call reverts on `initialize` and no funds move.
+    /// already happened, this reverts — against a hook that freezes config at
+    /// initialization the revert normally comes from `setPoolConfig` rejecting a write to
+    /// an already-locked pool, before `initialize` is even reached — and no funds move.
     function openNewConfigured(
         PoolKey calldata key,
         uint160 sqrtPriceX96,
@@ -272,7 +282,17 @@ contract FriarPositionManager is IUnlockCallback {
     ) external returns (uint256 positionId) {
         IConfigurableFeeHook(address(key.hooks)).setPoolConfig(key, cfg);
         manager.initialize(key, sqrtPriceX96);
+        _assertConfigApplied(key, cfg);
         return _open(key, bins, swapIn, maxPay0, maxPay1);
+    }
+
+    /// @dev Read the frozen config back and require it matches what was asked for, with
+    /// `locked` normalised since the hook sets it during adoption.
+    function _assertConfigApplied(PoolKey calldata key, IConfigurableFeeHook.PoolConfig calldata cfg) internal view {
+        IConfigurableFeeHook.PoolConfig memory got = IConfigurableFeeHook(address(key.hooks)).configOf(key.toId());
+        IConfigurableFeeHook.PoolConfig memory want = cfg;
+        want.locked = true;
+        if (keccak256(abi.encode(got)) != keccak256(abi.encode(want))) revert HookConfigNotApplied();
     }
 
     function _open(PoolKey calldata key, Bin[] calldata bins, SwapIn calldata swapIn, uint256 maxPay0, uint256 maxPay1)

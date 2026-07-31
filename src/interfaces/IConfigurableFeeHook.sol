@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
+import {PoolId} from "v4-core/src/types/PoolId.sol";
 
 /// @title IConfigurableFeeHook
 /// @notice The slice of a fee hook that the position manager needs in order to create a
@@ -38,4 +39,11 @@ interface IConfigurableFeeHook {
     /// proposal is recorded under `msg.sender` and is adopted only if `msg.sender` is also
     /// the address that initializes the pool.
     function setPoolConfig(PoolKey calldata key, PoolConfig calldata cfg) external;
+
+    /// @notice The frozen configuration a pool is actually running.
+    ///
+    /// The manager reads this back after initializing so that "your config was applied" is
+    /// verified rather than assumed. Matching the `setPoolConfig` ABI only proves a hook
+    /// can RECEIVE the call; it proves nothing about whether the hook honoured it.
+    function configOf(PoolId poolId) external view returns (PoolConfig memory);
 }

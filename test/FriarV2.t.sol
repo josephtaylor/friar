@@ -133,11 +133,12 @@ contract FriarV2Test is Test, Deployers {
     function test_sameBaseFeeAcrossDifferentTickSpacings() public {
         // V1's base fee was baseFactor x tickSpacing, so changing spacing changed the fee.
         // Here the same baseFeePips must survive a 10x change in bin width.
-        (PoolKey memory wide,) = initPool(
-            currency0, currency1, IHooks(address(friar)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 600, SQRT_PRICE_1_1
-        );
+        (PoolKey memory wide,) =
+            initPool(currency0, currency1, IHooks(address(friar)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 600, SQRT_PRICE_1_1);
         modifyLiquidityRouter.modifyLiquidity(
-            wide, ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}), ZERO_BYTES
+            wide,
+            ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}),
+            ZERO_BYTES
         );
 
         uint24 narrowFee = _swapAndGetFee(true, -1e15);
@@ -235,8 +236,9 @@ contract FriarV2Test is Test, Deployers {
         FriarV2.PoolConfig memory live = friar.configOf(fresh.toId());
         assertEq(live.baseFeePips, BASE_FEE_PIPS, "attacker's config must not attach");
         assertTrue(live.locked);
-        // the attacker's proposal still exists, it just never applied
-        assertEq(friar.pendingConfigOf(fresh.toId(), attacker).baseFeePips, 100_000);
+        // the attacker's proposal never applied, and once the pool is locked it reports
+        // empty too, since no proposal can ever be adopted after the freeze
+        assertEq(friar.pendingConfigOf(fresh.toId(), attacker).baseFeePips, 0, "dead proposal must report empty");
     }
 
     function test_registrantsOwnProposalIsTheOneAdopted() public {
@@ -261,7 +263,9 @@ contract FriarV2Test is Test, Deployers {
         friar.setPoolConfig(fresh, _cfg());
         manager.initialize(fresh, SQRT_PRICE_1_1);
         modifyLiquidityRouter.modifyLiquidity(
-            fresh, ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}), ZERO_BYTES
+            fresh,
+            ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}),
+            ZERO_BYTES
         );
 
         vm.warp(block.timestamp + 1 days); // pool sat idle between creation and launch
@@ -300,7 +304,9 @@ contract FriarV2Test is Test, Deployers {
         friar.setPoolConfig(fresh, c);
         manager.initialize(fresh, SQRT_PRICE_1_1);
         modifyLiquidityRouter.modifyLiquidity(
-            fresh, ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}), ZERO_BYTES
+            fresh,
+            ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}),
+            ZERO_BYTES
         );
 
         for (uint256 i = 0; i < bound(nSwaps, 1, 12); i++) {
@@ -480,6 +486,77 @@ contract FriarV2Test is Test, Deployers {
         assertLe(last, 100_000, "cap");
     }
 
+    // ── config lifecycle, per the external lifecycle review ──────────────────
+
+    function test_sameRegistrantOverwritesItsOwnProposal() public {
+        PoolKey memory k = _unlockedKey(120);
+        FriarV2.PoolConfig memory a = _cfg();
+        a.baseFeePips = 4000;
+        friar.setPoolConfig(k, a);
+        a.baseFeePips = 6000;
+        friar.setPoolConfig(k, a);
+        assertEq(friar.pendingConfigOf(k.toId(), address(this)).baseFeePips, 6000, "latest valid write wins");
+
+        manager.initialize(k, SQRT_PRICE_1_1);
+        assertEq(friar.configOf(k.toId()).baseFeePips, 6000, "and it is the one adopted");
+    }
+
+    function test_invalidOverwriteRevertsAndPreservesThePreviousProposal() public {
+        PoolKey memory k = _unlockedKey(120);
+        FriarV2.PoolConfig memory good = _cfg();
+        good.baseFeePips = 4000;
+        friar.setPoolConfig(k, good);
+
+        FriarV2.PoolConfig memory bad = good;
+        bad.windowK = 0; // below MIN_WINDOW_K
+        vm.expectRevert(FriarV2.InvalidParameters.selector);
+        friar.setPoolConfig(k, bad);
+
+        assertEq(friar.pendingConfigOf(k.toId(), address(this)).baseFeePips, 4000, "rejected write must not clobber");
+    }
+
+    function test_initializationBlocksEveryRegistrantNotJustTheWinner() public {
+        PoolKey memory k = _unlockedKey(120);
+        manager.initialize(k, SQRT_PRICE_1_1);
+
+        vm.expectRevert(FriarV2.AlreadyLocked.selector);
+        friar.setPoolConfig(k, _cfg());
+
+        vm.prank(address(0xBAD)); // a registrant who never proposed anything before
+        vm.expectRevert(FriarV2.AlreadyLocked.selector);
+        friar.setPoolConfig(k, _cfg());
+    }
+
+    /// `locked` is caller-supplied in the struct, so a proposal claiming to be already
+    /// frozen must be normalised rather than trusted.
+    function test_callerSuppliedLockedIsNormalised() public {
+        PoolKey memory k = _unlockedKey(120);
+        FriarV2.PoolConfig memory c = _cfg();
+        c.locked = true; // a lie
+        friar.setPoolConfig(k, c);
+        assertFalse(friar.pendingConfigOf(k.toId(), address(this)).locked, "proposal must be stored unlocked");
+
+        manager.initialize(k, SQRT_PRICE_1_1);
+        assertTrue(friar.configOf(k.toId()).locked, "and locked only by adoption");
+    }
+
+    /// Once frozen, the encoded config must never change again, whatever anyone does.
+    function testFuzz_frozenConfigIsImmutable(uint24 base, uint16 floor_, uint8 k_) public {
+        PoolKey memory key_ = _unlockedKey(120);
+        manager.initialize(key_, SQRT_PRICE_1_1);
+        bytes32 frozen = keccak256(abi.encode(friar.configOf(key_.toId())));
+
+        FriarV2.PoolConfig memory c = _cfg();
+        c.baseFeePips = uint24(bound(base, 1, friar.MAX_BASE_FEE_PIPS()));
+        c.filterFloor = uint16(bound(floor_, friar.MIN_FILTER_FLOOR(), 300));
+        c.filterCeil = 300;
+        c.windowK = uint8(bound(k_, friar.MIN_WINDOW_K(), friar.MAX_WINDOW_K()));
+
+        vm.expectRevert(FriarV2.AlreadyLocked.selector);
+        friar.setPoolConfig(key_, c);
+        assertEq(keccak256(abi.encode(friar.configOf(key_.toId()))), frozen, "frozen config mutated");
+    }
+
     // ── bounds: a hostile pool creator must stay harmless ────────────────────
 
     /// Fees are capped only by LB's own 10% ceiling, on purpose. Anything at or under it
@@ -501,7 +578,9 @@ contract FriarV2Test is Test, Deployers {
         friar.setPoolConfig(fine, c);
         manager.initialize(fine, SQRT_PRICE_1_1);
         modifyLiquidityRouter.modifyLiquidity(
-            fine, ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}), ZERO_BYTES
+            fine,
+            ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}),
+            ZERO_BYTES
         );
 
         vm.recordLogs();
