@@ -17,6 +17,7 @@ import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 
 import {Friar} from "../src/Friar.sol";
 import {FriarPositionManager} from "../src/FriarPositionManager.sol";
+import {FeeExemptionRegistry} from "../src/FeeExemptionRegistry.sol";
 
 interface IMarket {
     function swapMarket(bool zeroForOne, int256 amount) external;
@@ -199,6 +200,7 @@ contract FriarPositionManagerInvariantsTest is StdInvariant, Test, Deployers {
 
     Friar friar;
     FriarPositionManager fpm;
+    FeeExemptionRegistry registry;
     ManagerHandler handler;
 
     address treasury = makeAddr("treasury");
@@ -231,7 +233,13 @@ contract FriarPositionManagerInvariantsTest is StdInvariant, Test, Deployers {
             ZERO_BYTES
         );
 
-        fpm = new FriarPositionManager(manager, 1000, 100, treasury, bot, 1);
+        address[] memory exempt_ = new address[](1);
+
+        exempt_[0] = bot;
+
+        registry = new FeeExemptionRegistry(address(this), exempt_);
+
+        fpm = new FriarPositionManager(manager, 1000, 100, treasury, registry, 1);
 
         t0 = MockERC20(Currency.unwrap(currency0));
         t1 = MockERC20(Currency.unwrap(currency1));

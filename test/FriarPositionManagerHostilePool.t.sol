@@ -15,6 +15,7 @@ import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 
 import {FriarPositionManager} from "../src/FriarPositionManager.sol";
+import {FeeExemptionRegistry} from "../src/FeeExemptionRegistry.sol";
 import {UnboundedLiquidityFeeHook} from "./mocks/HostileHooks.sol";
 
 /// The position's OWN pool is hostile — not the zap venue.
@@ -27,6 +28,7 @@ contract FriarPositionManagerHostilePoolTest is Test, Deployers {
     using StateLibrary for IPoolManager;
 
     FriarPositionManager fpm;
+    FeeExemptionRegistry registry;
     UnboundedLiquidityFeeHook hostile;
     PoolKey hostileKey;
 
@@ -63,7 +65,13 @@ contract FriarPositionManagerHostilePoolTest is Test, Deployers {
             ZERO_BYTES
         );
 
-        fpm = new FriarPositionManager(manager, 1000, 100, treasury, bot, 1);
+        address[] memory exempt_ = new address[](1);
+
+        exempt_[0] = bot;
+
+        registry = new FeeExemptionRegistry(address(this), exempt_);
+
+        fpm = new FriarPositionManager(manager, 1000, 100, treasury, registry, 1);
 
         t0 = MockERC20(Currency.unwrap(currency0));
         t1 = MockERC20(Currency.unwrap(currency1));

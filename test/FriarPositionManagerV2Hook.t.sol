@@ -14,6 +14,7 @@ import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 
 import {FriarV2} from "../src/FriarV2.sol";
 import {FriarPositionManager} from "../src/FriarPositionManager.sol";
+import {FeeExemptionRegistry} from "../src/FeeExemptionRegistry.sol";
 import {IConfigurableFeeHook} from "../src/interfaces/IConfigurableFeeHook.sol";
 
 /// The manager <-> FriarV2 seam. The interesting property is not that a pool can be made,
@@ -22,6 +23,7 @@ import {IConfigurableFeeHook} from "../src/interfaces/IConfigurableFeeHook.sol";
 contract FriarPositionManagerV2HookTest is Test, Deployers {
     FriarV2 friar;
     FriarPositionManager fpm;
+    FeeExemptionRegistry registry;
 
     address alice = address(0xA11CE);
     address treasury = address(0x7EA);
@@ -69,7 +71,11 @@ contract FriarPositionManagerV2HookTest is Test, Deployers {
         friar = FriarV2(flags);
 
         // flat 5% both tiers, the shipping pricing
-        fpm = new FriarPositionManager(manager, 500, 500, treasury, bot, 101);
+        address[] memory exempt_ = new address[](1);
+        exempt_[0] = bot;
+        registry = new FeeExemptionRegistry(address(this), exempt_);
+
+        fpm = new FriarPositionManager(manager, 500, 500, treasury, registry, 101);
 
         MockERC20(Currency.unwrap(currency0)).mint(alice, 1_000e18);
         MockERC20(Currency.unwrap(currency1)).mint(alice, 1_000e18);

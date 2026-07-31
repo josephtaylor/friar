@@ -12,6 +12,7 @@ import {TransientStateLibrary} from "v4-core/src/libraries/TransientStateLibrary
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {ModifyLiquidityParams, SwapParams} from "v4-core/src/types/PoolOperation.sol";
 import {IConfigurableFeeHook} from "./interfaces/IConfigurableFeeHook.sol";
+import {IFeeExemptionRegistry} from "./interfaces/IFeeExemptionRegistry.sol";
 
 /// @notice Multi-tenant position manager: opens/closes a whole Position (N bins) as one
 /// atomic unit inside a single PoolManager unlock. Anyone may open; only the position
@@ -51,6 +52,7 @@ contract FriarPositionManager is IUnlockCallback {
     error PerfFeeTooHigh();
     error InvalidStartingPositionId();
     error ZeroTreasury();
+    error ZeroFeeExemptionRegistry();
 
     uint256 public constant MAX_BINS = 100;
     uint256 public constant MAX_PERF_FEE_BPS = 2_000; // hard sanity cap: 20%
@@ -64,7 +66,10 @@ contract FriarPositionManager is IUnlockCallback {
     /// @notice fee-exempt accounts (house bot, partners). Treasury-controlled: a
     /// discount-only power — it can never raise fees or touch principal. Checked at
     /// operation time, so changes apply to existing positions' future collections.
-    mapping(address => bool) public perfFeeExempt;
+    /// @notice Shared, cross-generation exemption list. Immutable by design: redeploying
+    /// the manager is already the upgrade path, so a mutable pointer would add far more
+    /// authority than a discount list warrants.
+    IFeeExemptionRegistry public immutable feeExemptionRegistry;
     address public treasury;
     address public pendingTreasury;
 
@@ -183,7 +188,6 @@ contract FriarPositionManager is IUnlockCallback {
     );
     event FeesCollected(uint256 indexed positionId, uint256 fees0, uint256 fees1, int256 delta0, int256 delta1);
     event PerfFeeCharged(uint256 indexed positionId, address indexed treasury, uint256 perf0, uint256 perf1);
-    event PerfFeeExemptSet(address indexed account, bool exempt);
     event TreasuryTransferStarted(address indexed from, address indexed to);
     event TreasuryTransferred(address indexed from, address indexed to);
 
@@ -192,7 +196,7 @@ contract FriarPositionManager is IUnlockCallback {
         uint16 _perfFeeBps,
         uint16 _simpleFeeBps,
         address _treasury,
-        address _perfFeeExempt,
+        IFeeExemptionRegistry _feeExemptionRegistry,
         uint256 _startingPositionId
     ) {
         if (_perfFeeBps > MAX_PERF_FEE_BPS || _simpleFeeBps > MAX_PERF_FEE_BPS) {
@@ -210,10 +214,8 @@ contract FriarPositionManager is IUnlockCallback {
         perfFeeBps = _perfFeeBps;
         simpleFeeBps = _simpleFeeBps;
         treasury = _treasury;
-        if (_perfFeeExempt != address(0)) {
-            perfFeeExempt[_perfFeeExempt] = true;
-            emit PerfFeeExemptSet(_perfFeeExempt, true);
-        }
+        if (address(_feeExemptionRegistry) == address(0)) revert ZeroFeeExemptionRegistry();
+        feeExemptionRegistry = _feeExemptionRegistry;
     }
 
     // ---------------------------------------------------------------- verbs
@@ -466,15 +468,6 @@ contract FriarPositionManager is IUnlockCallback {
         pendingTreasury = address(0);
     }
 
-    /// @notice Grant or revoke perf fee exemption. Discount-only: cannot raise anyone's
-    /// fees, cannot touch principal — the worst a rogue treasury does here is waive
-    /// its own revenue.
-    function setPerfFeeExempt(address account, bool exempt) external {
-        if (msg.sender != treasury) revert NotTreasury();
-        perfFeeExempt[account] = exempt;
-        emit PerfFeeExemptSet(account, exempt);
-    }
-
     // ---------------------------------------------------------------- views
 
     function getPosition(uint256 positionId)
@@ -507,8 +500,20 @@ contract FriarPositionManager is IUnlockCallback {
     /// @dev Fee rate for an operation: exempt accounts pay nothing; single-bin ("simple")
     /// positions pay simpleFeeBps; shaped (multi-bin) positions pay perfFeeBps.
     function _feeRate(address account, uint256 binCount) internal view returns (uint16) {
-        if (perfFeeExempt[account]) return 0;
+        if (_isExempt(account)) return 0;
         return binCount == 1 ? simpleFeeBps : perfFeeBps;
+    }
+
+    /// @dev A registry failure must never trap funds. Defaulting to NOT exempt means the
+    /// worst case is that someone pays the manager's own immutable rate, which is the same
+    /// bounded harm the treasury already has; the alternative would let a reverting
+    /// registry block every collect and close.
+    function _isExempt(address account) internal view returns (bool) {
+        try feeExemptionRegistry.isExempt(account) returns (bool exempt) {
+            return exempt;
+        } catch {
+            return false;
+        }
     }
 
     function _decrease(

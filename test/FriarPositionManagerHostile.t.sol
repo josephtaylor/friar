@@ -14,6 +14,7 @@ import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 
 import {Friar} from "../src/Friar.sol";
 import {FriarPositionManager} from "../src/FriarPositionManager.sol";
+import {FeeExemptionRegistry} from "../src/FeeExemptionRegistry.sol";
 import {UnboundedFeeHook} from "./mocks/HostileHooks.sol";
 
 /// Adversarial-venue suite. The manager is permissionless in its venues: `_requireSameCurrencies`
@@ -22,6 +23,7 @@ import {UnboundedFeeHook} from "./mocks/HostileHooks.sol";
 contract FriarPositionManagerHostileTest is Test, Deployers {
     Friar friar;
     FriarPositionManager fpm;
+    FeeExemptionRegistry registry;
     UnboundedFeeHook hostile;
     PoolKey hostileKey;
 
@@ -51,7 +53,13 @@ contract FriarPositionManagerHostileTest is Test, Deployers {
             ZERO_BYTES
         );
 
-        fpm = new FriarPositionManager(manager, 1000, 100, treasury, bot, 1);
+        address[] memory exempt_ = new address[](1);
+
+        exempt_[0] = bot;
+
+        registry = new FeeExemptionRegistry(address(this), exempt_);
+
+        fpm = new FriarPositionManager(manager, 1000, 100, treasury, registry, 1);
 
         // The attacker's venue: same pair, its own hook, seeded so it looks like the
         // deepest price-sane pool a zap-out would route through.

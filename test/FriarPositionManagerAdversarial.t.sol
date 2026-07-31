@@ -14,6 +14,7 @@ import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 
 import {Friar} from "../src/Friar.sol";
 import {FriarPositionManager} from "../src/FriarPositionManager.sol";
+import {FeeExemptionRegistry} from "../src/FeeExemptionRegistry.sol";
 import {ReentrantHook} from "./mocks/HostileHooks.sol";
 import {FeeOnTransferToken, ReturnsFalseToken, CallbackToken, ExitRevertingToken} from "./mocks/HostileTokens.sol";
 
@@ -23,6 +24,7 @@ import {FeeOnTransferToken, ReturnsFalseToken, CallbackToken, ExitRevertingToken
 contract FriarPositionManagerAdversarialTest is Test, Deployers {
     Friar friar;
     FriarPositionManager fpm;
+    FeeExemptionRegistry registry;
 
     address treasury = makeAddr("treasury");
     address bot = makeAddr("bot");
@@ -50,7 +52,13 @@ contract FriarPositionManagerAdversarialTest is Test, Deployers {
             ZERO_BYTES
         );
 
-        fpm = new FriarPositionManager(manager, 1000, 100, treasury, bot, 1);
+        address[] memory exempt_ = new address[](1);
+
+        exempt_[0] = bot;
+
+        registry = new FeeExemptionRegistry(address(this), exempt_);
+
+        fpm = new FriarPositionManager(manager, 1000, 100, treasury, registry, 1);
 
         t0 = MockERC20(Currency.unwrap(currency0));
         t1 = MockERC20(Currency.unwrap(currency1));

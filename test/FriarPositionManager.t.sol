@@ -16,12 +16,15 @@ import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 
 import {Friar} from "../src/Friar.sol";
 import {FriarPositionManager} from "../src/FriarPositionManager.sol";
+import {FeeExemptionRegistry} from "../src/FeeExemptionRegistry.sol";
+import {IFeeExemptionRegistry} from "../src/interfaces/IFeeExemptionRegistry.sol";
 
 contract FriarPositionManagerTest is Test, Deployers {
     using StateLibrary for IPoolManager;
 
     Friar friar;
     FriarPositionManager fpm;
+    FeeExemptionRegistry registry;
 
     address treasury = makeAddr("treasury");
     address bot = makeAddr("bot"); // fee-exempt
@@ -50,7 +53,13 @@ contract FriarPositionManagerTest is Test, Deployers {
             ZERO_BYTES
         );
 
-        fpm = new FriarPositionManager(manager, 1000, 100, treasury, bot, 1); // 10% shaped / 1% simple
+        address[] memory exempt_ = new address[](1);
+
+        exempt_[0] = bot;
+
+        registry = new FeeExemptionRegistry(address(this), exempt_);
+
+        fpm = new FriarPositionManager(manager, 1000, 100, treasury, registry, 1); // 10% shaped / 1% simple
 
         t0 = MockERC20(Currency.unwrap(currency0));
         t1 = MockERC20(Currency.unwrap(currency1));
@@ -545,15 +554,15 @@ contract FriarPositionManagerTest is Test, Deployers {
 
     function test_constructor_perfFeeCap() public {
         vm.expectRevert(FriarPositionManager.PerfFeeTooHigh.selector);
-        new FriarPositionManager(manager, 2001, 100, treasury, bot, 1);
+        new FriarPositionManager(manager, 2001, 100, treasury, registry, 1);
         vm.expectRevert(FriarPositionManager.PerfFeeTooHigh.selector);
-        new FriarPositionManager(manager, 1000, 2001, treasury, bot, 1);
+        new FriarPositionManager(manager, 1000, 2001, treasury, registry, 1);
     }
 
     /// A redeploy must be able to continue past the previous manager's ids: off-chain
     /// position history is keyed by id, so restarting at 1 would clobber it.
     function test_startingPositionId_continuesPastPriorDeployment() public {
-        FriarPositionManager next = new FriarPositionManager(manager, 1000, 100, treasury, bot, 10);
+        FriarPositionManager next = new FriarPositionManager(manager, 1000, 100, treasury, registry, 10);
         assertEq(next.nextPositionId(), 10);
 
         vm.startPrank(alice);
@@ -571,7 +580,7 @@ contract FriarPositionManagerTest is Test, Deployers {
     /// A zero treasury would burn every perf fee to address(0), unrecoverably.
     function test_constructor_rejectsZeroTreasury() public {
         vm.expectRevert(FriarPositionManager.ZeroTreasury.selector);
-        new FriarPositionManager(manager, 1000, 100, address(0), bot, 1);
+        new FriarPositionManager(manager, 1000, 100, address(0), registry, 1);
     }
 
     /// The two-step handover can never RESULT in a zero treasury: `acceptTreasury` sets
@@ -604,28 +613,60 @@ contract FriarPositionManagerTest is Test, Deployers {
 
     function test_constructor_rejectsZeroStartingId() public {
         vm.expectRevert(FriarPositionManager.InvalidStartingPositionId.selector);
-        new FriarPositionManager(manager, 1000, 100, treasury, bot, 0);
+        new FriarPositionManager(manager, 1000, 100, treasury, registry, 0);
     }
 
-    function test_setPerfFeeExempt_treasuryGated() public {
-        vm.expectRevert(FriarPositionManager.NotTreasury.selector);
-        fpm.setPerfFeeExempt(alice, true);
+    /// The registry is a shared dependency of every verb, so a broken one must not be able
+    /// to trap funds. `_isExempt` swallows the failure and defaults to NOT exempt, so the
+    /// worst case is that someone pays the manager's own immutable rate — the same bounded
+    /// harm the treasury already has. The alternative, an unguarded call, would let a
+    /// reverting registry block every collect and close for every position.
+    function test_brokenRegistryChargesNormalFeeAndNeverTrapsFunds() public {
+        FriarPositionManager broken =
+            new FriarPositionManager(manager, 1000, 100, treasury, new RevertingRegistry(), 5000);
 
-        vm.prank(treasury);
-        fpm.setPerfFeeExempt(alice, true);
-        assertTrue(fpm.perfFeeExempt(alice));
+        vm.startPrank(alice);
+        t0.approve(address(broken), type(uint256).max);
+        t1.approve(address(broken), type(uint256).max);
+        uint256 id = broken.open(key, _threeBinBids(), _noSwapIn(), type(uint256).max, type(uint256).max);
+        vm.stopPrank();
 
-        vm.prank(treasury);
-        fpm.setPerfFeeExempt(alice, false);
-        assertFalse(fpm.perfFeeExempt(alice));
+        swap(key, true, -20e18, ZERO_BYTES);
+
+        uint256 tr0 = t0.balanceOf(treasury) + t1.balanceOf(treasury);
+        vm.prank(alice);
+        broken.collect(id, _noZap(), 0, 0, 0, 0); // must not revert
+        assertGt(t0.balanceOf(treasury) + t1.balanceOf(treasury), tr0, "fee must still be charged");
+
+        vm.prank(alice);
+        broken.close(id, _noZap(), 0, 0, 0, 0); // and the exit must still work
     }
 
-    function test_setPerfFeeExempt_appliesToExistingPosition() public {
+    /// Exemptions moved out of the manager into a shared registry, so the gate is the
+    /// registry's admin, not this manager's treasury. That separation is deliberate:
+    /// transferring one manager's treasury must not hand anyone authority over discounts
+    /// across every manager generation.
+    function test_exemption_registryAdminGated() public {
+        vm.prank(alice);
+        vm.expectRevert(FeeExemptionRegistry.NotAdmin.selector);
+        registry.setExempt(alice, true);
+
+        vm.prank(treasury); // the manager's treasury has no say here either
+        vm.expectRevert(FeeExemptionRegistry.NotAdmin.selector);
+        registry.setExempt(alice, true);
+
+        registry.setExempt(alice, true); // this contract is the registry admin
+        assertTrue(registry.isExempt(alice));
+
+        registry.setExempt(alice, false);
+        assertFalse(registry.isExempt(alice));
+    }
+
+    function test_exemption_appliesToExistingPosition() public {
         uint256 id = _open(alice); // opened while NOT exempt
         swap(key, true, -20e18, ZERO_BYTES);
 
-        vm.prank(treasury);
-        fpm.setPerfFeeExempt(alice, true); // comp granted mid-life
+        registry.setExempt(alice, true); // comp granted mid-life
 
         uint256 tr0 = t0.balanceOf(treasury);
         vm.prank(alice);
@@ -633,8 +674,7 @@ contract FriarPositionManagerTest is Test, Deployers {
         assertEq(t0.balanceOf(treasury), tr0, "exemption must apply to future collections");
 
         // revoke, accrue more fees, collect again: fee flows again
-        vm.prank(treasury);
-        fpm.setPerfFeeExempt(alice, false);
+        registry.setExempt(alice, false);
         swap(key, false, -20e18, ZERO_BYTES);
         swap(key, true, -20e18, ZERO_BYTES);
         vm.prank(alice);
@@ -659,5 +699,15 @@ contract FriarPositionManagerTest is Test, Deployers {
         fpm.acceptTreasury();
         assertEq(fpm.treasury(), newTreasury);
         assertEq(fpm.pendingTreasury(), address(0));
+    }
+}
+
+/// A registry that fails every call, to prove the manager degrades to "charge the normal
+/// fee" rather than "nobody can withdraw".
+contract RevertingRegistry is IFeeExemptionRegistry {
+    error Broken();
+
+    function isExempt(address) external pure returns (bool) {
+        revert Broken();
     }
 }

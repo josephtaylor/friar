@@ -5,6 +5,7 @@ import {Script, console2} from "forge-std/Script.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 
 import {FriarPositionManager} from "../src/FriarPositionManager.sol";
+import {IFeeExemptionRegistry} from "../src/interfaces/IFeeExemptionRegistry.sol";
 
 /// @notice Deploys the FriarPositionManager. No address mining needed (not a hook).
 /// Verify the source on the explorer immediately after deploy.
@@ -26,7 +27,11 @@ import {FriarPositionManager} from "../src/FriarPositionManager.sol";
 ///   against the measured blend, sits under SectorOne's measured ~8%, and matches the 5%
 ///   Ramses advertises.
 ///   TREASURY     fee recipient        (default: the broadcasting sender)
-///   PERF_FEE_EXEMPT  house bot        (default: the broadcasting sender)
+///   FEE_EXEMPTION_REGISTRY  REQUIRED. The shared FeeExemptionRegistry every manager
+///     generation reads. Deploy it once (script/DeployFeeExemptionRegistry.s.sol) and
+///     reuse the address forever: the whole point is that the exemption list stops dying
+///     with each manager. There is no default, because silently deploying a manager
+///     pointed at the wrong list is exactly the drift this replaced.
 ///   STARTING_POSITION_ID  first id this deployment mints (default 1). On a REDEPLOY set
 ///     this above the previous manager's highest id — off-chain history is keyed by id,
 ///     so restarting at 1 would collide with and clobber the old records. The live
@@ -46,10 +51,15 @@ contract DeployFriarPositionManager is Script {
         vm.startBroadcast();
         address sender = msg.sender;
         address treasury = vm.envOr("TREASURY", sender);
-        address perfFeeExempt = vm.envOr("PERF_FEE_EXEMPT", sender);
+        address registry = vm.envAddress("FEE_EXEMPTION_REGISTRY");
 
         FriarPositionManager fpm = new FriarPositionManager(
-            IPoolManager(POOL_MANAGER), perfFeeBps, simpleFeeBps, treasury, perfFeeExempt, startingPositionId
+            IPoolManager(POOL_MANAGER),
+            perfFeeBps,
+            simpleFeeBps,
+            treasury,
+            IFeeExemptionRegistry(registry),
+            startingPositionId
         );
         vm.stopBroadcast();
 
@@ -57,7 +67,7 @@ contract DeployFriarPositionManager is Script {
         console2.log("  perfFeeBps:", perfFeeBps);
         console2.log("  simpleFeeBps:", simpleFeeBps);
         console2.log("  treasury:", treasury);
-        console2.log("  perfFeeExempt:", perfFeeExempt);
+        console2.log("  feeExemptionRegistry:", registry);
         console2.log("  startingPositionId:", startingPositionId);
     }
 }
