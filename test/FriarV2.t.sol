@@ -30,9 +30,7 @@ contract FriarV2Test is Test, Deployers {
     function _cfg() internal pure returns (FriarV2.PoolConfig memory) {
         return FriarV2.PoolConfig({
             baseFeePips: BASE_FEE_PIPS,
-            filterFloor: 10, // == MIN_FILTER_FLOOR: degenerates to LB on dense flow
-            filterCeil: 300,
-            windowK: 3,
+            filterPeriod: 10, // LB's own value; the app never varies it
             decayPeriod: 600,
             reductionFactor: 5000,
             variableFeeControl: 40_000,
@@ -89,44 +87,7 @@ contract FriarV2Test is Test, Deployers {
     // EWMA collapse, every swap re-anchors, and fee revenue halves versus LB's constant.
     // The floor is what makes adaptivity one-way. It must be unrepresentable to go below.
 
-    function test_filterFloorBelowLBConstantIsRejected() public {
-        FriarV2.PoolConfig memory c = _cfg();
-        c.filterFloor = friar.MIN_FILTER_FLOOR() - 1;
-        vm.expectRevert(FriarV2.InvalidParameters.selector);
-        friar.setPoolConfig(_unlockedKey(80), c);
-    }
-
-    function testFuzz_windowNeverBelowFloor(uint32 gapSeconds) public {
-        gapSeconds = uint32(bound(gapSeconds, 0, 100_000));
-        PoolId id = key.toId();
-        for (uint256 i = 0; i < 5; i++) {
-            vm.warp(block.timestamp + gapSeconds);
-            _swapAndGetFee(i % 2 == 0, -1e15);
-            assertGe(friar.filterWindow(id), _cfg().filterFloor, "window dipped below floor");
-            assertLe(friar.filterWindow(id), _cfg().filterCeil, "window exceeded ceiling");
-        }
-    }
-
     // ── adaptivity actually adapts ───────────────────────────────────────────
-
-    function test_windowWidensOnSparseFlowAndFloorsOnDenseFlow() public {
-        PoolId id = key.toId();
-        assertEq(friar.filterWindow(id), 10, "cold start should sit at the floor");
-
-        // sparse flow: 120s between swaps -> EWMA climbs -> window opens past the floor
-        for (uint256 i = 0; i < 60; i++) {
-            vm.warp(block.timestamp + 120);
-            _swapAndGetFee(i % 2 == 0, -1e15);
-        }
-        uint16 sparseWindow = friar.filterWindow(id);
-        assertGt(sparseWindow, 10, "sparse flow should widen the window past the floor");
-
-        // dense flow: same-second swaps -> EWMA decays -> window returns to the floor
-        for (uint256 i = 0; i < 200; i++) {
-            _swapAndGetFee(i % 2 == 0, -1e15);
-        }
-        assertEq(friar.filterWindow(id), 10, "dense flow should collapse back to the floor, not below");
-    }
 
     // ── base fee is decoupled from tick spacing ──────────────────────────────
 
@@ -255,25 +216,6 @@ contract FriarV2Test is Test, Deployers {
         assertEq(friar.configOf(fresh.toId()).baseFeePips, 5000, "initializer's own proposal wins");
     }
 
-    /// MEDIUM, from review: the first observation is initialize-to-first-swap, not an
-    /// inter-swap gap. Seeding the EWMA with it let a pool created long before launch start
-    /// pinned at the ceiling for hundreds of swaps (~117 for a 1h first gap, ~217 for 1d).
-    function test_longIdleBeforeFirstSwapDoesNotPinTheWindowHigh() public {
-        PoolKey memory fresh = _unlockedKey(120);
-        friar.setPoolConfig(fresh, _cfg());
-        manager.initialize(fresh, SQRT_PRICE_1_1);
-        modifyLiquidityRouter.modifyLiquidity(
-            fresh,
-            ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}),
-            ZERO_BYTES
-        );
-
-        vm.warp(block.timestamp + 1 days); // pool sat idle between creation and launch
-        swap(fresh, true, -1e15, ZERO_BYTES);
-
-        assertEq(friar.filterWindow(fresh.toId()), _cfg().filterFloor, "first gap must not seed the window");
-    }
-
     /// MEDIUM, from review: spacing-invariance holds only while the derived accumulator
     /// fits in uint24. At very fine spacings it clamps. Documented rather than fixed —
     /// raising it further would need a wider VolatilityState field.
@@ -286,40 +228,6 @@ contract FriarV2Test is Test, Deployers {
         assertEq(friar.effectiveMaxVolatilityAccumulator(_unlockedKey(1)), cap, "1-tick clamps hard");
     }
 
-    /// The floor invariant must survive arbitrary registration, ordering and gap sequences,
-    /// not just the paths the other tests happen to walk.
-    function testFuzz_windowFloorHoldsAcrossArbitraryConfigsAndGaps(
-        uint16 floor_,
-        uint16 ceil_,
-        uint8 k,
-        uint16 gap,
-        uint8 nSwaps
-    ) public {
-        FriarV2.PoolConfig memory c = _cfg();
-        c.filterFloor = uint16(bound(floor_, friar.MIN_FILTER_FLOOR(), 600));
-        c.filterCeil = uint16(bound(ceil_, c.filterFloor, 600));
-        c.windowK = uint8(bound(k, friar.MIN_WINDOW_K(), friar.MAX_WINDOW_K()));
-
-        PoolKey memory fresh = _unlockedKey(120);
-        friar.setPoolConfig(fresh, c);
-        manager.initialize(fresh, SQRT_PRICE_1_1);
-        modifyLiquidityRouter.modifyLiquidity(
-            fresh,
-            ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}),
-            ZERO_BYTES
-        );
-
-        for (uint256 i = 0; i < bound(nSwaps, 1, 12); i++) {
-            vm.warp(block.timestamp + bound(gap, 0, 20_000));
-            swap(fresh, i % 2 == 0, -1e15, ZERO_BYTES);
-            uint16 w = friar.filterWindow(fresh.toId());
-            assertGe(w, friar.MIN_FILTER_FLOOR(), "floor invariant broken");
-            assertGe(w, c.filterFloor, "configured floor broken");
-            assertLe(w, c.filterCeil, "ceiling broken");
-            assertLe(w, c.decayPeriod, "window must never exceed decayPeriod");
-        }
-    }
-
     // ── EWMA state machine under explicit gap sequences (2nd review) ─────────
 
     function _freshPool(int24 spacing) internal returns (PoolKey memory p) {
@@ -329,61 +237,6 @@ contract FriarV2Test is Test, Deployers {
         modifyLiquidityRouter.modifyLiquidity(
             p, ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 100e18, salt: 0}), ZERO_BYTES
         );
-    }
-
-    /// Walk the gap ladder the review asked for and record the window at each step. The
-    /// window must track flow density monotonically-ish and never leave [floor, ceil].
-    function test_windowTrajectoryAcrossGapLadder() public {
-        PoolKey memory p = _freshPool(120);
-        uint16[7] memory gaps = [uint16(0), 1, 3, 10, 57, 300, 1000];
-
-        for (uint256 g = 0; g < gaps.length; g++) {
-            for (uint256 i = 0; i < 40; i++) {
-                vm.warp(block.timestamp + gaps[g]);
-                swap(p, i % 2 == 0, -1e14, ZERO_BYTES);
-            }
-            uint16 w = friar.filterWindow(p.toId());
-            assertGe(w, _cfg().filterFloor, "below floor");
-            assertLe(w, _cfg().filterCeil, "above ceiling");
-            // window should be ~3x the sustained gap, clamped
-            uint256 want = uint256(gaps[g]) * _cfg().windowK;
-            if (want < _cfg().filterFloor) want = _cfg().filterFloor;
-            if (want > _cfg().filterCeil) want = _cfg().filterCeil;
-            assertApproxEqAbs(w, want, want / 4 + 2, "window did not converge on 3x the sustained gap");
-        }
-    }
-
-    /// Several swaps inside one block: gap is 0 every time, so the EWMA is dragged down and
-    /// the window must sit exactly on the floor rather than underflowing it.
-    ///
-    /// The window must be genuinely ELEVATED first or this proves nothing. The very first
-    /// observation is discarded by design (it is initialize-to-first-swap, not an
-    /// inter-swap gap), so one long-gap swap seeds the EWMA at the floor and a burst from
-    /// there would trivially "stay" on the floor.
-    function test_sameBlockBurstPinsWindowToFloorNotBelow() public {
-        PoolKey memory p = _freshPool(120);
-
-        vm.warp(block.timestamp + 600);
-        swap(p, true, -1e14, ZERO_BYTES); // discarded seed: does NOT elevate anything
-
-        for (uint256 i = 0; i < 40; i++) {
-            vm.warp(block.timestamp + 300); // sustained sparse flow actually raises the EWMA
-            swap(p, i % 2 == 0, -1e14, ZERO_BYTES);
-        }
-        assertGt(friar.filterWindow(p.toId()), _cfg().filterFloor, "setup failed to elevate the window");
-
-        // Each zero-gap fold multiplies the EWMA by 31/32, so collapsing from a 300s EWMA
-        // to the floor takes ~142 swaps, not 100. Assert the floor holds at EVERY step, so
-        // this catches an underflow mid-collapse rather than only at the end.
-        uint16 prev = friar.filterWindow(p.toId());
-        for (uint256 i = 0; i < 250; i++) {
-            swap(p, i % 2 == 0, -1e14, ZERO_BYTES); // no warp: gap == 0
-            uint16 w = friar.filterWindow(p.toId());
-            assertGe(w, _cfg().filterFloor, "window underflowed the floor mid-collapse");
-            assertLe(w, prev, "zero-gap flow must never widen the window");
-            prev = w;
-        }
-        assertEq(prev, _cfg().filterFloor, "same-block burst must land on the floor");
     }
 
     /// The elevated tail both reviews flagged: longer windows mean the surge decays more
@@ -442,50 +295,6 @@ contract FriarV2Test is Test, Deployers {
         revert("no Swap event");
     }
 
-    /// "Thin then suddenly active": a long silence arms a long window, and the review asked
-    /// whether the first swap after silence re-anchors. It must, and the burst that follows
-    /// then sits inside the long window (which is the intended behaviour: a pool that just
-    /// woke up prices the wake-up move rather than sleeping through it).
-    function test_silenceThenBurstReanchorsThenHoldsTheLongWindow() public {
-        PoolKey memory p = _freshPool(120);
-        vm.warp(block.timestamp + 30);
-        swap(p, true, -1e14, ZERO_BYTES);
-        for (uint256 i = 0; i < 40; i++) {
-            vm.warp(block.timestamp + 300);
-            swap(p, i % 2 == 0, -1e14, ZERO_BYTES);
-        }
-        assertEq(friar.filterWindow(p.toId()), _cfg().filterCeil, "sustained silence should arm the ceiling");
-
-        // Fees lag one swap: beforeSwap reads the tick as it stood BEFORE the swap, so a
-        // re-anchor always lands on the bucket price is already in. To observe the
-        // reference actually moving, price has to move in one swap and the re-anchor
-        // happen on the next.
-        // ~5e18 against 1e20 of liquidity moves roughly 1000 ticks, i.e. 8+ buckets at
-        // spacing 120. Sizing matters: 5e17 moves only ~100 ticks, which crosses a bucket
-        // boundary only if the pool happens to sit near one, so it would make this test
-        // pass or fail on where price drifted rather than on the behaviour under test.
-        int24 refBefore = friar.volatilityState(p.toId()).bucketReference;
-        swap(p, true, -5e18, ZERO_BYTES); // moves price several buckets; ref not yet updated
-        assertEq(friar.volatilityState(p.toId()).bucketReference, refBefore, "ref moves on the NEXT swap, not this one");
-
-        vm.warp(block.timestamp + 400); // > filterCeil, so the next swap re-anchors
-        swap(p, true, -1e14, ZERO_BYTES);
-        int24 refAfter = friar.volatilityState(p.toId()).bucketReference;
-        assertTrue(refAfter != refBefore, "long silence must re-anchor onto the moved bucket");
-
-        // Now burst in ONE direction at 1s gaps: far inside the long window, so no further
-        // re-anchor happens, delta grows every swap, and the surge must actually build.
-        uint24 first = _swapFeeOn(p, true);
-        uint24 last = first;
-        for (uint256 i = 0; i < 10; i++) {
-            vm.warp(block.timestamp + 1);
-            last = _swapFeeOnSized(p, true, -1e18); // large enough to keep crossing buckets
-        }
-        assertGt(last, BASE_FEE_PIPS, "burst inside a long window must build a surge, not sit at base");
-        assertGt(last, first, "surge must grow across the burst");
-        assertLe(last, 100_000, "cap");
-    }
-
     // ── config lifecycle, per the external lifecycle review ──────────────────
 
     function test_sameRegistrantOverwritesItsOwnProposal() public {
@@ -508,7 +317,7 @@ contract FriarV2Test is Test, Deployers {
         friar.setPoolConfig(k, good);
 
         FriarV2.PoolConfig memory bad = good;
-        bad.windowK = 0; // below MIN_WINDOW_K
+        bad.filterPeriod = 0; // a zero filter period is rejected
         vm.expectRevert(FriarV2.InvalidParameters.selector);
         friar.setPoolConfig(k, bad);
 
@@ -541,16 +350,14 @@ contract FriarV2Test is Test, Deployers {
     }
 
     /// Once frozen, the encoded config must never change again, whatever anyone does.
-    function testFuzz_frozenConfigIsImmutable(uint24 base, uint16 floor_, uint8 k_) public {
+    function testFuzz_frozenConfigIsImmutable(uint24 base, uint16 filter_) public {
         PoolKey memory key_ = _unlockedKey(120);
         manager.initialize(key_, SQRT_PRICE_1_1);
         bytes32 frozen = keccak256(abi.encode(friar.configOf(key_.toId())));
 
         FriarV2.PoolConfig memory c = _cfg();
         c.baseFeePips = uint24(bound(base, 1, friar.MAX_BASE_FEE_PIPS()));
-        c.filterFloor = uint16(bound(floor_, friar.MIN_FILTER_FLOOR(), 300));
-        c.filterCeil = 300;
-        c.windowK = uint8(bound(k_, friar.MIN_WINDOW_K(), friar.MAX_WINDOW_K()));
+        c.filterPeriod = uint16(bound(filter_, 1, 600));
 
         vm.expectRevert(FriarV2.AlreadyLocked.selector);
         friar.setPoolConfig(key_, c);
@@ -594,24 +401,6 @@ contract FriarV2Test is Test, Deployers {
             }
         }
         assertEq(fee, 100_000, "10% base must be expressible on 10-tick bins");
-    }
-
-    function test_rejectsWindowKOutOfRange() public {
-        FriarV2.PoolConfig memory c = _cfg();
-        c.windowK = friar.MIN_WINDOW_K() - 1;
-        vm.expectRevert(FriarV2.InvalidParameters.selector);
-        friar.setPoolConfig(_unlockedKey(80), c);
-
-        c.windowK = friar.MAX_WINDOW_K() + 1;
-        vm.expectRevert(FriarV2.InvalidParameters.selector);
-        friar.setPoolConfig(_unlockedKey(80), c);
-    }
-
-    function test_rejectsCeilingAboveDecayPeriod() public {
-        FriarV2.PoolConfig memory c = _cfg();
-        c.filterCeil = c.decayPeriod + 1;
-        vm.expectRevert(FriarV2.InvalidParameters.selector);
-        friar.setPoolConfig(_unlockedKey(80), c);
     }
 
     function testFuzz_feeNeverExceedsLBCap(uint8 swaps, uint16 gap) public {

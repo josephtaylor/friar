@@ -25,9 +25,7 @@ import {PoolId} from "v4-core/src/types/PoolId.sol";
 interface IConfigurableFeeHook {
     struct PoolConfig {
         uint24 baseFeePips;
-        uint16 filterFloor;
-        uint16 filterCeil;
-        uint8 windowK;
+        uint16 filterPeriod;
         uint16 decayPeriod;
         uint16 reductionFactor;
         uint24 variableFeeControl;

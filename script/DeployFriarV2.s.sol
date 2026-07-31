@@ -30,15 +30,13 @@ import {FriarV2} from "../src/FriarV2.sol";
 ///     ~37bps instead. A lower base wins more routing but fails the revenue bar, which is
 ///     the wrong trade for a pool nobody has joined yet.
 ///
-///   FILTER_FLOOR 10 == MIN_FILTER_FLOOR. This is a safety property, not a preference:
-///     with a lower floor, whole-second timestamps on dense (3.7s-gap) flow let the EWMA
-///     collapse, every swap re-anchors, and revenue HALVES versus LB's constant. At the
-///     floor the hook degenerates to exactly v1 behaviour on dense flow.
-///
-///   FILTER_CEIL 300 / WINDOW_K 3. Window = clamp(3 x EWMA(gap), 10s, 300s). Grinding the
-///     fee back to base takes 27x longer than against the constant on thin pools, and
-///     pinning the fee HIGH costs an attacker more per hour than the pool's entire
-///     turnover, so neither direction is economic.
+///   FILTER_PERIOD 10, i.e. LB's own value, and the app should not vary it. The failure
+///     directions are asymmetric: too short only means the surge never fires, too long
+///     means references stop refreshing, the accumulator ratchets, and the fee pins high
+///     enough to starve routing. Regime drift runs thin -> routed, INTO the severe
+///     direction, and a frozen config cannot be corrected without a new pool — which for
+///     a venue competing on depth means splitting the depth, so it is not a real option.
+///     Lengthen only for a pool with positive reason to stay sparse.
 ///
 ///   MAX_VOLATILITY_TICKS 7000. The surge saturates at 7000 ticks of price displacement
 ///     regardless of bin width. Ticks are logarithmic, so that is roughly +101% up and
@@ -55,9 +53,7 @@ contract DeployFriarV2 is Script {
     function run() external {
         FriarV2.PoolConfig memory cfg = FriarV2.PoolConfig({
             baseFeePips: uint24(vm.envOr("BASE_FEE_PIPS", uint256(9000))),
-            filterFloor: uint16(vm.envOr("FILTER_FLOOR", uint256(10))),
-            filterCeil: uint16(vm.envOr("FILTER_CEIL", uint256(300))),
-            windowK: uint8(vm.envOr("WINDOW_K", uint256(3))),
+            filterPeriod: uint16(vm.envOr("FILTER_PERIOD", uint256(10))),
             decayPeriod: uint16(vm.envOr("DECAY_PERIOD", uint256(600))),
             reductionFactor: uint16(vm.envOr("REDUCTION_FACTOR", uint256(5000))),
             variableFeeControl: uint24(vm.envOr("VARIABLE_FEE_CONTROL", uint256(40_000))),
@@ -83,8 +79,7 @@ contract DeployFriarV2 is Script {
 
         console2.log("FriarV2 deployed:", address(friar));
         console2.log("  baseFeePips:", cfg.baseFeePips);
-        console2.log("  filterFloor / ceil:", cfg.filterFloor, cfg.filterCeil);
-        console2.log("  windowK:", cfg.windowK);
+        console2.log("  filterPeriod:", cfg.filterPeriod);
         console2.log("  decayPeriod:", cfg.decayPeriod);
         console2.log("  reductionFactor:", cfg.reductionFactor);
         console2.log("  variableFeeControl:", cfg.variableFeeControl);

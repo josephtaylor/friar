@@ -37,9 +37,7 @@ contract FriarPositionManagerV2HookTest is Test, Deployers {
     function _cfg(uint24 basePips) internal pure returns (IConfigurableFeeHook.PoolConfig memory) {
         return IConfigurableFeeHook.PoolConfig({
             baseFeePips: basePips,
-            filterFloor: 10,
-            filterCeil: 300,
-            windowK: 3,
+            filterPeriod: 10,
             decayPeriod: 600,
             reductionFactor: 5000,
             variableFeeControl: 40_000,
@@ -51,9 +49,7 @@ contract FriarPositionManagerV2HookTest is Test, Deployers {
     function _hookCfg(uint24 basePips) internal pure returns (FriarV2.PoolConfig memory) {
         return FriarV2.PoolConfig({
             baseFeePips: basePips,
-            filterFloor: 10,
-            filterCeil: 300,
-            windowK: 3,
+            filterPeriod: 10,
             decayPeriod: 600,
             reductionFactor: 5000,
             variableFeeControl: 40_000,

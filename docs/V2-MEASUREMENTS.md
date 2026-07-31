@@ -30,42 +30,49 @@ Two facts worth keeping in view:
   inside top-decile volatility windows, and 79% of swaps there arrive within 10s. The
   daily mean hides the only distribution that matters for the accumulator.
 
-## Adaptive window vs LB's constant
+## The adaptive window: measured, then cut
 
-Same base fee, spacing 150, `k=3`, floor 10s, ceil 300s.
+An earlier version of this hook made `filterPeriod` adaptive, tracking an EWMA of
+inter-swap gaps. Replayed against a fixed swap trace it looked strong: +16% revenue on the
+routed pool, +113% on the thin one, no regression on dense flow, and 1.75x to 27x longer to
+grind the fee back to base.
 
-| regime | constant | adaptive | revenue | time to grind fee back to base |
-|---|---|---|---|---|
-| dense 3.7s | 1.406% avg, $366 | 1.415% avg, $368 | **+0.7%** | 90s both (identical, by design) |
-| routed 10.5s | 0.364% avg, $1,760 | 0.422% avg, $2,041 | **+16%** | 80s → 140s |
-| thin 57s | 0.313% avg, $265 | 0.668% avg, $566 | **+113%** | 70s → 1,889s |
+**It was cut anyway.** The replay's numbers were real and the conclusion drawn from them was
+not, because every one of them assumed flow was exogenous. Four things killed it:
 
-On the thin pool the constant leaves the fee at base for **79.6%** of swaps; adaptive cuts
-that to 5.6%. The dense case is deliberately flat: that is the floor doing its job.
+- **Cadence is not economically meaningful.** A $0.01 swap and a $100k swap are one
+  observation each. On a chain where gas rounds to $0.0003, that signal is cheap to steer.
+- **Normalising it economically collapses it.** The natural normaliser is notional over
+  active liquidity, which *is* price displacement, which is what the LB accumulator already
+  measures. The separate cadence channel does not measure anything independent.
+- **Routing is endogenous.** Adaptive charges more; charging more on a thin pool costs
+  routing. Estimated loop gain for fee → routing → cadence → fee was **0.264 in the thin
+  regime against 0.059 routed** — 4.5x stronger exactly where a bootstrapping pool lives.
+  So the earlier claim that adaptive was "strictly dominant, never worse by construction"
+  was wrong: the floor protects the accumulator's behaviour, not the pool's competitiveness.
+- **Sparse observation is a symptom, not a cause.** A pool sees long gaps because it is
+  losing routes. Making it charge its few remaining trades more attacks the causal chain
+  backwards. More usable liquidity near spot attacks it at the front:
+  better execution → more routes → more frequent reference updates → smaller observed
+  episodes → lower variable fees → more routes.
 
-### Why the floor is a safety property, not a preference
+What replaced it is per-pool `filterPeriod` as **configuration**, defaulting to LB's 10s.
+That gets a flow-matched window without a runtime controller, without a second endogenous
+signal, and without a feedback loop to defend.
 
-With `filterFloor` removed, on dense (3.7s) flow and whole-second `block.timestamp`, the
-EWMA collapses toward zero, every swap re-anchors the reference, the accumulator never
-builds, and **revenue halves** versus the constant ($267 vs $564). The floor makes
-adaptivity one-way: the window can only ever be longer than LB's constant, never shorter.
-`MIN_FILTER_FLOOR` is enforced at registration, revalidated at initialize, and clamped
-again locally in `_window`.
+### Why the default is the short end, not a matched value
 
-## Attack economics
+The failure directions are asymmetric:
 
-Costs include the price impact required to move buckets, computed from real liquidity. Gas
-is $0.0003/swap at 0.0202 gwei and ETH $1,900, so gas alone never bounds an attack here.
-
-| attack | constant | adaptive |
+| `filterPeriod` | effect | severity |
 |---|---|---|
-| suppress (grind fee to base) | 70-90s | 140s routed, 1,889-4,796s thin |
-| wait-it-out | fee drops after 10s | holds past 10s, decays from 30s |
-| grief (pin fee high) | $386,156/hr | $16,775/hr thin, $838,842/hr routed |
+| too short | references re-anchor constantly, surge never fires, pool behaves like a static-fee pool | benign |
+| too long | references stop refreshing, accumulator ratchets to its ceiling, fee pins high | **starves routing** |
 
-Grief reaches the 10% cap on **both** designs; it is uneconomic on both because moving
-price costs more per hour than the pool's entire turnover. Counting only gas makes it look
-viable, which is the mistake to avoid.
+Regime drift runs thin → routed, which is *into* the severe direction. And the usual escape
+hatch — launch a new pool with a better config — means splitting depth, which for a venue
+competing on depth is not a real option. So the default is LB's value and lengthening it
+needs positive evidence a pool will stay sparse.
 
 ## Base fee
 
@@ -90,6 +97,27 @@ only **15% lower** for the pricier pool (implied elasticity ≈ -1.2, so revenue
 which is close enough to flat that two data points cannot distinguish it from zero. Fee
 level is therefore roughly revenue-neutral and materially volume-relevant. Treat that as a
 single point estimate, not a curve.
+
+## What this does NOT establish
+
+The replay treats routed flow as **exogenous**: a fixed swap trace goes in, fees come out.
+Live behaviour is a loop — fee affects routing, routing affects cadence, cadence affects the
+window, the window affects fee. Estimated loop gain at the two measured operating points is
+0.059 (routed) and 0.264 (thin), and the clamps force it to zero outside the adaptive band,
+because a pinned window has no cadence sensitivity. That is reassuring, not conclusive:
+interior gain could peak higher, since the surge-vs-gap slope was linearised from two points
+and routing elasticity may rise sharply where a quote crosses a competing route.
+
+The elasticity underpinning all of it is also weaker than its sample size suggests. It was
+inferred from two pools with different fees and different volumes, so it is a correlation:
+depth, price impact, competitor liquidity and arbitrage all move both variables, and part of
+the -1.2 may be common market conditions rather than flow reacting to fees.
+
+The decisive test is therefore not another fixed-trace backtest. It is a simulation where
+route allocation is computed from actual quotes against a competing pool, so elasticity
+*emerges* and can be compared with the -1.2 estimate, scored on LP net PnL and routing share
+rather than fee revenue. Until that exists, treat the revenue figures above as an upper bound
+measured under an assumption that production will violate.
 
 ## Accepted limitations
 

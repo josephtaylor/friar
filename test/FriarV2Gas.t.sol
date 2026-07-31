@@ -45,9 +45,7 @@ contract FriarV2GasTest is Test, Deployers {
                 manager,
                 FriarV2.PoolConfig({
                     baseFeePips: 9000,
-                    filterFloor: 10,
-                    filterCeil: 300,
-                    windowK: 3,
+                    filterPeriod: 10,
                     decayPeriod: 600,
                     reductionFactor: 5000,
                     variableFeeControl: 40_000,
