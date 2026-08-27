@@ -1,11 +1,30 @@
-# friar
+<p align="center">
+  <a href="https://app.friar.fi"><img src="apps/site/public/og.png" alt="Friar: a DLMM for Robinhood Chain" width="640"></a>
+</p>
 
-A DLMM (dynamic liquidity market maker) and LP position manager for
-[Robinhood Chain](https://chain.robinhood.com), an Arbitrum Orbit L2, chain id **4663**.
+<h1 align="center">friar</h1>
+
+<p align="center">
+  A DLMM (dynamic liquidity market maker) and LP position manager for
+  <a href="https://robinhood.com/chain">Robinhood Chain</a>, an Arbitrum Orbit L2, chain id <b>4663</b>.
+</p>
+
+<p align="center">
+  <b><a href="https://app.friar.fi">Live at app.friar.fi</a></b>
+  &nbsp;·&nbsp; <a href="https://friar.fi/docs/">Docs</a>
+  &nbsp;·&nbsp; <a href="https://www.npmjs.com/package/@josephtaylor/friar-sdk">npm</a>
+</p>
+
+---
 
 It shipped, it worked, and approximately nobody used it. Putting the whole thing up
 because the code is more useful public than it is sitting on my disk. Contracts through
-frontend, all in here.
+frontend, all in here. **It is still running**, so you can click around before reading
+any of it.
+
+<p align="center">
+  <a href="https://app.friar.fi"><img src="apps/site/public/docs/img/ui-positions.png" alt="The Friar dashboard: open positions with their bin shapes, PnL, and fees earned" width="820"></a>
+</p>
 
 ## What it is
 
