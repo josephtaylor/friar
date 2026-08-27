@@ -1,0 +1,23 @@
+{
+  "name": "@friar/indexer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8790 --inspector-port 9231 --persist-to ../../.wrangler-persist --test-scheduled",
+    "deploy": "wrangler deploy",
+    "db:schema": "wrangler d1 execute friar --local --persist-to ../../.wrangler-persist --file schema.sql",
+    "db:schema:remote": "wrangler d1 execute friar --remote --file schema.sql",
+    "db:seed": "wrangler d1 execute friar --local --persist-to ../../.wrangler-persist --file ../../scripts/seed-demo.sql",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@friar/chain": "*",
+    "@friar/core": "*",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250705.0",
+    "wrangler": "^4.24.0"
+  }
+}

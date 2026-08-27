@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Closing a position · Friar docs</title>
+<meta name="description" content="Friar docs: a step-by-step guide to opening, reading, and closing a position, plus how the contracts work and where your funds sit." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<meta name="theme-color" content="#100c07" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Closing a position · Friar docs" />
+<meta property="og:image" content="https://friar.fi/og.png?v=3" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="/docs/docs.css" />
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">FRIAR</a>
+  <nav class="top-links">
+    <a href="/docs/">docs</a>
+    <a href="https://discord.gg/wCjfVcq9C" target="_blank" rel="noreferrer">discord</a>
+    <a class="cta" href="https://app.friar.fi?ref=docs">launch app →</a>
+  </nav>
+</header>
+<div class="shell">
+  <aside class="side">
+    <div class="side-h">the docs</div>
+    <nav class="side-nav">
+        <a class="nav-item" href="/docs/">Overview</a>
+        <div class="side-sec">User guide</div>
+        <a class="nav-item" href="/docs/guide-start">Getting started</a>
+        <a class="nav-item" href="/docs/guide-tokens">The Tokens board</a>
+        <a class="nav-item" href="/docs/guide-pools">The Friar Pools page</a>
+        <a class="nav-item" href="/docs/opening">Opening a position</a>
+        <a class="nav-item" href="/docs/guide-position">Your position page</a>
+        <a class="nav-item" href="/docs/guide-fees">Collecting fees</a>
+        <a class="nav-item active" href="/docs/guide-close">Closing a position</a>
+        <a class="nav-item" href="/docs/guide-history">Positions & history</a>
+        <div class="side-sec">How it works</div>
+        <a class="nav-item" href="/docs/shapes">Positions & shapes</a>
+        <a class="nav-item" href="/docs/fees">How the fee is set</a>
+        <a class="nav-item" href="/docs/costs">What Friar charges</a>
+        <a class="nav-item" href="/docs/anatomy">Where your money sits</a>
+        <a class="nav-item" href="/docs/range">When it goes wrong</a>
+    </nav>
+  </aside>
+  <main class="doc">
+    <h1>Closing a position</h1>
+<p>Closing burns every bin, collects every fee, and pays out. One call, whatever the shape.</p>
+<p>There are two buttons, and the difference between them is what you&#39;re holding when it&#39;s over.</p>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-position-actions.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-position-actions.png" decoding="async" width="1568" height="97" alt="The position action row: Share PnL, Claim fees, Close, and the gold Close and zap to WETH button." /></a></div>
+  <figcaption><b>Close</b> keeps the tokens. <b>Close &amp; zap</b> sells them for the
+  quote.</figcaption>
+</figure><h2 id="close">Close</h2>
+<p>Burns the bins, sweeps the fees, sends you both sides as they are. If price was mid-range
+you&#39;ll receive some quote and some token — that&#39;s what the position was actually holding.</p>
+<p>Take this one when you want to keep the token, or when you&#39;d rather choose your own moment and
+venue to sell it.</p>
+<h2 id="close-amp-zap-to-weth">Close &amp; zap to WETH</h2>
+<p>The same exit, plus a sale of the token side into the quote, so you end up holding one asset.
+How that sale happens depends on what&#39;s available:</p>
+<ul>
+<li><strong>Best case, one transaction.</strong> The app finds the deepest <em>price-sane</em> v4 venue for the pair
+and does the swap inside the same unlock as the burn. Nothing touches your wallet in between.</li>
+<li><strong>Otherwise, a guided three-step:</strong> close, approve the router, sell on Uniswap&#39;s
+SwapRouter02 against the token&#39;s canonical v3 pool or v2 pair — each step narrated, with a
+min-out guard on the swap.</li>
+</ul>
+<p>Two guards are worth knowing about, because they can make a close <em>revert</em> rather than fill:</p>
+<ul>
+<li><strong>A payout floor.</strong> The quote you receive is floored at the last marked value less the venue
+fee and a 5% allowance for impact and staleness. A venue that has moved or is mispriced
+fails the transaction instead of quietly realising the loss for you.</li>
+<li><strong>Pay caps of zero.</strong> An exit can never pull funds <em>from</em> your wallet. Without that cap, a
+venue whose hook returns an unbounded swap delta could turn &quot;close my position&quot; into a
+withdrawal against your allowance.</li>
+</ul>
+<p>If the token has no route to the quote at all, the app says so and points you at plain
+<strong>Close</strong> rather than guessing.</p>
+<blockquote>
+<p>The app may warn that it&#39;s routing through a <strong>hooked venue</strong> that takes its own swap fee.
+Launchpad pools (Doppler, Clanker, Pons-style) work this way and they&#39;re often the only real
+liquidity for the token, so they aren&#39;t excluded — the on-chain pay caps and the payout floor
+are what bound your downside, and the notice just tells you whose venue you&#39;re crossing.</p>
+</blockquote>
+<h2 id="choosing-which">Choosing which</h2>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Close</strong></td>
+<td>you want the token, or you&#39;ll sell it yourself later</td>
+</tr>
+<tr>
+<td><strong>Close &amp; zap</strong></td>
+<td>you want to be flat and done, in one action</td>
+</tr>
+</tbody></table></div>
+<p>If the thesis is gone, zap. If you&#39;d have bought this token anyway, plain close and keep it.</p>
+<h2 id="after-it-closes">After it closes</h2>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-position-closed.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-position-closed.png" decoding="async" width="1567" height="352" alt="A closed position page for LEMON.FUN/WETH #7: a CLOSED chip, realized PnL minus 44.10 percent, fees banked plus 12.58 percent, inventory delta minus 56.68 percent, current value zero, and a banner reading CLOSED, numbers frozen at close, with a link to the close transaction." /></a></div>
+  <figcaption>A real closed position. The fee side returned 12.58% of capital in 36 hours; the
+  token fell hard enough that inventory took 56.68% back. Net −44.10%.</figcaption>
+</figure><p>The page stays, and the numbers <strong>freeze at close</strong>. <code>Realized PnL</code>, <code>Fees banked</code> and
+<code>Inventory delta</code> are final; current value goes to zero because there&#39;s nothing left in the
+bins. The banner links to the close transaction on the explorer.</p>
+<p>The position moves to <a href="/docs/guide-history">History</a>, and its bin chart becomes &quot;shape at
+close&quot; — what the position looked like at the end.</p>
+<p><strong>Leftover tokens.</strong> If you used plain Close and later want to be flat, the closed position
+page offers a sweeper for the owner: it sells your whole wallet balance of that token into the
+quote through its canonical v3 or v2 pool. It runs off your balance rather than the position,
+so it also mops up dust from earlier claims. A token with no direct pool against the quote
+can&#39;t be swept there, and the app says so rather than pretending.</p>
+<h2 id="if-you-39-d-rather-wait">If you&#39;d rather wait</h2>
+<p>Closing isn&#39;t the only answer to a position that&#39;s gone against you. Out of range costs you
+nothing except the fees you aren&#39;t earning while you sit there, and a position whose token has
+genuinely repriced is often better <em>reopened around the new price</em> than held or dumped.
+<a href="/docs/range">When price leaves your range</a> is the page on that decision.</p>
+<h2 id="what-you-don-39-t-need-us-for">What you don&#39;t need us for</h2>
+<p>Your exit doesn&#39;t depend on our servers. The whole position — owner, pool and every bin — is
+stored on-chain, and the manager&#39;s <code>close</code> is callable directly from the explorer with nothing
+but the position id. If the app is down, the indexer is behind, or Friar disappears entirely,
+the money still comes out. That&#39;s the <a href="/docs/anatomy">governing
+principle</a> of the split between what&#39;s on-chain and what isn&#39;t.</p>
+
+    <div class="pagers">
+      <a class="pager prev" href="/docs/guide-fees"><span>previous</span>Collecting fees</a>
+      <a class="pager next" href="/docs/guide-history"><span>next</span>Positions & history</a>
+    </div>
+    <footer>
+      friar.fi · an independent project on Robinhood Chain, not affiliated with or endorsed
+      by Robinhood · nothing here is financial advice
+    </footer>
+  </main>
+</div>
+<script src="/beacon.js" defer></script>
+</body>
+</html>

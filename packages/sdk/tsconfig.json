@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    // Map the bundled workspaces to SOURCE. Without this the emitted .d.ts re-exports
+    // from "@friar/chain", which does not exist on npm, and every consumer's types break.
+    "paths": {
+      "@friar/core": ["../core/src/index.ts"],
+      "@friar/chain": ["../chain/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

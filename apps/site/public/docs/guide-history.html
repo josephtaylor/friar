@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Positions and history · Friar docs</title>
+<meta name="description" content="Friar docs: a step-by-step guide to opening, reading, and closing a position, plus how the contracts work and where your funds sit." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<meta name="theme-color" content="#100c07" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Positions and history · Friar docs" />
+<meta property="og:image" content="https://friar.fi/og.png?v=3" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="/docs/docs.css" />
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">FRIAR</a>
+  <nav class="top-links">
+    <a href="/docs/">docs</a>
+    <a href="https://discord.gg/wCjfVcq9C" target="_blank" rel="noreferrer">discord</a>
+    <a class="cta" href="https://app.friar.fi?ref=docs">launch app →</a>
+  </nav>
+</header>
+<div class="shell">
+  <aside class="side">
+    <div class="side-h">the docs</div>
+    <nav class="side-nav">
+        <a class="nav-item" href="/docs/">Overview</a>
+        <div class="side-sec">User guide</div>
+        <a class="nav-item" href="/docs/guide-start">Getting started</a>
+        <a class="nav-item" href="/docs/guide-tokens">The Tokens board</a>
+        <a class="nav-item" href="/docs/guide-pools">The Friar Pools page</a>
+        <a class="nav-item" href="/docs/opening">Opening a position</a>
+        <a class="nav-item" href="/docs/guide-position">Your position page</a>
+        <a class="nav-item" href="/docs/guide-fees">Collecting fees</a>
+        <a class="nav-item" href="/docs/guide-close">Closing a position</a>
+        <a class="nav-item active" href="/docs/guide-history">Positions & history</a>
+        <div class="side-sec">How it works</div>
+        <a class="nav-item" href="/docs/shapes">Positions & shapes</a>
+        <a class="nav-item" href="/docs/fees">How the fee is set</a>
+        <a class="nav-item" href="/docs/costs">What Friar charges</a>
+        <a class="nav-item" href="/docs/anatomy">Where your money sits</a>
+        <a class="nav-item" href="/docs/range">When it goes wrong</a>
+    </nav>
+  </aside>
+  <main class="doc">
+    <h1>Positions and history</h1>
+<p>Two screens, one book. <strong>Positions</strong> is what&#39;s open, <strong>History</strong> is what&#39;s closed, and the
+numbers are computed the same way on both.</p>
+<h2 id="positions">Positions</h2>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-positions.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-positions.png" decoding="async" width="1567" height="729" alt="The Friar Positions dashboard: tiles for portfolio value 0.3176 WETH, open PnL minus 5.62 percent with a fees and inventory breakdown, fees earned plus 0.0046 WETH, and 2 open positions with 12 closed and 14 all-time; below, two position cards for APES/WETH and PONS/WETH each with a bin chart and its own PnL." /></a></div>
+  <figcaption>The whole book in one screen. The tiles aggregate every open position; the cards
+  are each one.</figcaption>
+</figure><p>The tiles across the top:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Tile</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Portfolio value</strong></td>
+<td>everything open, marked to market, with a sparkline of where it&#39;s been</td>
+</tr>
+<tr>
+<td><strong>Open PnL</strong></td>
+<td>aggregate return, and underneath it the split — <code>fees +1.36% · inv −6.99%</code></td>
+</tr>
+<tr>
+<td><strong>Fees earned</strong></td>
+<td>total fee income across open positions, net of the performance fee</td>
+</tr>
+<tr>
+<td><strong>Open positions</strong></td>
+<td>how many are live, plus the closed and all-time counts</td>
+</tr>
+</tbody></table></div>
+<p>The <code>fees … · inv …</code> line under Open PnL is the same decomposition as on a <a href="/docs/guide-position">position
+page</a>, rolled up. It&#39;s the fastest read on the screen: it tells you
+whether the book is being carried by fee income or dragged by inventory.</p>
+<h3 id="the-cards">The cards</h3>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-position-card.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-position-card.png" decoding="async" width="1568" height="145" alt="A position card for PONS/WETH #9: 63 bins, open 33.6 hours, an IN RANGE chip, a bin chart annotated '26% drop / 102% pump to breach', and minus 8.22 percent with fees plus 1.70 percent, inv minus 9.93 percent, value 0.2226 WETH." /></a></div>
+</figure><p>One card per open position, each with its shape drawn live. Three things to read:</p>
+<ul>
+<li><strong>the status chip</strong> — IN RANGE, or which edge it has left</li>
+<li><strong>the breach line</strong> under the chart — <code>26% drop / 102% pump to breach</code>. How far price has to
+move before this position stops earning, in both directions. It&#39;s the single most useful
+number on the card</li>
+<li><strong>the PnL block</strong> on the right, with the same fees/inventory split</li>
+</ul>
+<p>Click any card to open its <a href="/docs/guide-position">position page</a>.</p>
+<p>With nothing open, the screen offers you the Tokens board and the open button instead.</p>
+<h2 id="history">History</h2>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-history.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-history.png" decoding="async" width="1372" height="894" alt="The Friar History screen: tiles for realized PnL minus 0.1377 WETH, fees banked plus 0.0748 WETH, 12 closed positions with 8 of 12 closed green, and average hold 17.4 hours; below, a table of closed positions with final PnL, fees banked and inventory delta for each." /></a></div>
+  <figcaption>Closed positions, frozen at close. The Export CSV button is top-right.</figcaption>
+</figure><p>Realized PnL and fees banked across everything closed, how many closed green, and how long you
+typically hold. The table is one row per closed position, newest first, with the same three
+numbers each time: final PnL, fees banked, inventory delta.</p>
+<p>Read down the fees column and you learn something the PnL column hides. In the book above,
+every single closed position banked positive fees — the losses are entirely inventory. That&#39;s
+what LPing a volatile token looks like when the fee model is working and the token selection
+isn&#39;t.</p>
+<p><strong>Export CSV</strong> downloads the lot — id, token, open and close timestamps, and the PnL, fees,
+inventory and value columns in WETH — for whatever you do your accounting in.</p>
+<p>Click any row for its <a href="/docs/guide-position">position page</a>, which stays available forever with
+its numbers frozen at close.</p>
+<h2 id="sharing-a-book">Sharing a book</h2>
+<p>Both screens are keyed by address and read from public ledger data, so either can be opened
+read-only for any wallet:</p>
+<pre><code>https://app.friar.fi/?address=0xTheirAddressHere
+https://app.friar.fi/history?address=0xTheirAddressHere
+</code></pre>
+<p>No wallet needed, no action buttons rendered. Useful for sharing your own book, or for looking
+at someone else&#39;s.</p>
+
+    <div class="pagers">
+      <a class="pager prev" href="/docs/guide-close"><span>previous</span>Closing a position</a>
+      <a class="pager next" href="/docs/shapes"><span>next</span>Positions & shapes</a>
+    </div>
+    <footer>
+      friar.fi · an independent project on Robinhood Chain, not affiliated with or endorsed
+      by Robinhood · nothing here is financial advice
+    </footer>
+  </main>
+</div>
+<script src="/beacon.js" defer></script>
+</body>
+</html>

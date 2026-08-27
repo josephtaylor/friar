@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Where your money sits · Friar docs</title>
+<meta name="description" content="Friar docs: a step-by-step guide to opening, reading, and closing a position, plus how the contracts work and where your funds sit." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<meta name="theme-color" content="#100c07" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Where your money sits · Friar docs" />
+<meta property="og:image" content="https://friar.fi/og.png?v=3" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="/docs/docs.css" />
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">FRIAR</a>
+  <nav class="top-links">
+    <a href="/docs/">docs</a>
+    <a href="https://discord.gg/wCjfVcq9C" target="_blank" rel="noreferrer">discord</a>
+    <a class="cta" href="https://app.friar.fi?ref=docs">launch app →</a>
+  </nav>
+</header>
+<div class="shell">
+  <aside class="side">
+    <div class="side-h">the docs</div>
+    <nav class="side-nav">
+        <a class="nav-item" href="/docs/">Overview</a>
+        <div class="side-sec">User guide</div>
+        <a class="nav-item" href="/docs/guide-start">Getting started</a>
+        <a class="nav-item" href="/docs/guide-tokens">The Tokens board</a>
+        <a class="nav-item" href="/docs/guide-pools">The Friar Pools page</a>
+        <a class="nav-item" href="/docs/opening">Opening a position</a>
+        <a class="nav-item" href="/docs/guide-position">Your position page</a>
+        <a class="nav-item" href="/docs/guide-fees">Collecting fees</a>
+        <a class="nav-item" href="/docs/guide-close">Closing a position</a>
+        <a class="nav-item" href="/docs/guide-history">Positions & history</a>
+        <div class="side-sec">How it works</div>
+        <a class="nav-item" href="/docs/shapes">Positions & shapes</a>
+        <a class="nav-item" href="/docs/fees">How the fee is set</a>
+        <a class="nav-item" href="/docs/costs">What Friar charges</a>
+        <a class="nav-item active" href="/docs/anatomy">Where your money sits</a>
+        <a class="nav-item" href="/docs/range">When it goes wrong</a>
+    </nav>
+  </aside>
+  <main class="doc">
+    <h1>Where your money sits</h1>
+<p>Two contracts. Every function either one exposes is listed below, and all of it is readable on
+the explorer.</p>
+<blockquote>
+<p><strong>The position manager isn&#39;t audited</strong>, and it&#39;s immutable — no pause, no upgrade, no
+rescue. The same immutability means no admin key can take your funds either.</p>
+</blockquote>
+<h2 id="the-shape-of-it">The shape of it</h2>
+<p>Friar is two contracts, the manager and the hook. Opening a position calls the manager, which
+calls Uniswap&#39;s PoolManager, and that&#39;s the one holding your money. The hook isn&#39;t in that
+path at all. It only runs when somebody swaps.</p>
+<figure>
+  <div class="frame"><a class="zoom" href="/docs/img/anatomy.png" target="_blank" rel="noreferrer" title="open full size"><svg class="diagram" role="img" aria-label="Diagram: your wallet signs calls to the Friar position manager, which mints liquidity inside Uniswap v4's PoolManager where the funds are held. The hook only sets the dynamic swap fee. The treasury only receives the performance fee and can only waive it." xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="#100c07"/>
+
+  <!-- masthead -->
+  <text x="64" y="78" text-anchor="start" font-family="IBM Plex Mono" font-size="32" font-weight="600" fill="#cf9440" letter-spacing="9">FRIAR</text>
+  <text x="1536" y="76" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#8a7a5f" letter-spacing="3">ANATOMY OF A POSITION</text>
+  <line x1="64" y1="108" x2="1536" y2="108" stroke="#2a2012" stroke-width="1"/>
+  <text x="64" y="176" text-anchor="start" font-family="IBM Plex Sans" font-size="46" font-weight="600" fill="#ece3d2">Where your money actually sits</text>
+  <text x="64" y="218" text-anchor="start" font-family="IBM Plex Sans" font-size="21" font-weight="400" fill="#8a7a5f">The manager mints your bins inside Uniswap's PoolManager and keeps a record of them.</text>
+  <text x="64" y="248" text-anchor="start" font-family="IBM Plex Sans" font-size="21" font-weight="400" fill="#8a7a5f">It never holds a balance of its own.</text>
+
+  <!-- the hook, above the pool it prices -->
+  <rect x="1066" y="168" width="470" height="108" rx="10" fill="#181209" stroke="#463620" stroke-width="1.5"/>
+  <text x="1301" y="205" text-anchor="middle" font-family="IBM Plex Mono" font-size="23" font-weight="400" fill="#ece3d2">Friar hook</text>
+  <text x="1301" y="234" text-anchor="middle" font-family="IBM Plex Sans" font-size="19" font-weight="400" fill="#8a7a5f">sets dynamic swap fee</text>
+  <text x="1301" y="259" text-anchor="middle" font-family="IBM Plex Sans" font-size="18" font-weight="400" fill="#8fbf5f">not called on deposits or withdrawals</text>
+  <line x1="1301" y1="276" x2="1301" y2="324" stroke="#8a7a5f" stroke-width="2" stroke-dasharray="6 6"/>
+  <polygon points="1301,332 1295,321 1307,321" fill="#8a7a5f"/>
+  <text x="1413" y="312" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">fee only</text>
+
+  <!-- your wallet -->
+  <rect x="64" y="336" width="290" height="244" rx="10" fill="#211910" stroke="#463620" stroke-width="1.5"/>
+  <text x="209" y="392" text-anchor="middle" font-family="IBM Plex Mono" font-size="24" font-weight="400" fill="#ece3d2" letter-spacing="1">YOUR WALLET</text>
+  <text x="209" y="444" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8a7a5f">signs every action</text>
+  <text x="209" y="476" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8a7a5f">holds your tokens</text>
+  <text x="209" y="530" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8fbf5f">every payout lands here</text>
+
+  <!-- the manager -->
+  <rect x="510" y="336" width="400" height="244" rx="10" fill="#211910" stroke="#cf9440" stroke-width="1.5"/>
+  <text x="710" y="388" text-anchor="middle" font-family="IBM Plex Mono" font-size="23" font-weight="400" fill="#cf9440">FriarPositionManager</text>
+  <text x="710" y="432" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8a7a5f">stores your position</text>
+  <text x="710" y="462" text-anchor="middle" font-family="IBM Plex Mono" font-size="19" font-weight="400" fill="#ece3d2">owner · pool key · bins</text>
+  <line x1="550" y1="488" x2="870" y2="488" stroke="#2a2012"/>
+  <text x="710" y="520" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8a7a5f">routes your calls into v4</text>
+  <text x="710" y="552" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8fbf5f">never holds a balance</text>
+
+  <!-- uniswap, where the money is -->
+  <rect x="1066" y="336" width="470" height="244" rx="10" fill="#181209" stroke="#8fbf5f" stroke-width="2"/>
+  <text x="1301" y="388" text-anchor="middle" font-family="IBM Plex Mono" font-size="23" font-weight="400" fill="#8fbf5f">Uniswap v4 PoolManager</text>
+  <text x="1301" y="436" text-anchor="middle" font-family="IBM Plex Sans" font-size="23" font-weight="600" fill="#ece3d2">YOUR LIQUIDITY LIVES HERE</text>
+  <text x="1301" y="472" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8a7a5f">Uniswap's own contract</text>
+  <text x="1301" y="512" text-anchor="middle" font-family="IBM Plex Sans" font-size="19" font-weight="400" fill="#8a7a5f">positions keyed by owner</text>
+  <text x="1301" y="542" text-anchor="middle" font-family="IBM Plex Sans" font-size="19" font-weight="400" fill="#8a7a5f">fees accrue in place</text>
+
+  <!-- flows -->
+  <line x1="362" y1="418" x2="493" y2="418" stroke="#cf9440" stroke-width="2"/>
+    <polygon points="502,418 491,412 491,424" fill="#cf9440"/>
+    <text x="432" y="404" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">calls</text>
+  <line x1="502" y1="504" x2="371" y2="504" stroke="#8fbf5f" stroke-width="2"/>
+    <polygon points="362,504 373,498 373,510" fill="#8fbf5f"/>
+    <text x="432" y="490" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8fbf5f">payouts</text>
+  <line x1="918" y1="418" x2="1049" y2="418" stroke="#cf9440" stroke-width="2"/>
+    <polygon points="1058,418 1047,412 1047,424" fill="#cf9440"/>
+    <text x="988" y="404" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">liquidity</text>
+  <line x1="1058" y1="504" x2="927" y2="504" stroke="#8fbf5f" stroke-width="2"/>
+    <polygon points="918,504 929,498 929,510" fill="#8fbf5f"/>
+    <text x="988" y="490" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8fbf5f">fees</text>
+
+  <!-- treasury -->
+  <rect x="510" y="656" width="400" height="104" rx="10" fill="#181209" stroke="#463620" stroke-width="1.5"/>
+  <text x="710" y="692" text-anchor="middle" font-family="IBM Plex Mono" font-size="22" font-weight="400" fill="#ece3d2">treasury</text>
+  <text x="710" y="723" text-anchor="middle" font-family="IBM Plex Sans" font-size="19" font-weight="400" fill="#8a7a5f">receives the performance fee</text>
+  <text x="710" y="747" text-anchor="middle" font-family="IBM Plex Sans" font-size="19" font-weight="400" fill="#8a7a5f">can only waive it</text>
+  <!-- the perf fee leaves the manager and goes DOWN to the treasury; arrowhead follows the money -->
+  <line x1="710" y1="592" x2="710" y2="646" stroke="#8a7a5f" stroke-width="2" stroke-dasharray="6 6"/>
+  <polygon points="710,654 704,643 716,643" fill="#8a7a5f"/>
+  <text x="842" y="628" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">perf fee</text>
+
+  <!-- footer -->
+  <line x1="64" y1="826" x2="1536" y2="826" stroke="#2a2012" stroke-width="1"/>
+  <text x="64" y="864" text-anchor="start" font-family="IBM Plex Mono" font-size="22" font-weight="400" fill="#cf9440" letter-spacing="2">friar.fi</text>
+  <text x="1536" y="864" text-anchor="end" font-family="IBM Plex Mono" font-size="19" font-weight="400" fill="#5d5138">Robinhood Chain · 4663</text>
+</svg></a></div>
+  <figcaption>The manager doesn't custody anything. It mints your bins inside Uniswap's
+  PoolManager and stores a record of what it minted. When you withdraw, it reads your address
+  off that record and sends the funds there.</figcaption>
+</figure><h2 id="who-can-do-what">Who can do what</h2>
+<p>Each row is enforced by a check in the code, with the revert name in brackets. This is the
+full list of roles. There aren&#39;t any others.</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Address</th>
+<th>Can</th>
+<th>Cannot</th>
+<th>Worst case if the key is stolen</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>You</strong>, the position owner</td>
+<td>open, add, remove, collect, close. Only your own positions</td>
+<td>touch anyone else&#39;s position (<code>NotPositionOwner</code>)</td>
+<td>your funds, same as any wallet</td>
+</tr>
+<tr>
+<td><strong>Treasury</strong>, Friar&#39;s revenue address</td>
+<td>receive the performance fee, hand the role on in two steps, <strong>waive</strong> the fee for an address</td>
+<td>raise a fee, touch principal, move a position, redirect a payout (<code>NotTreasury</code>)</td>
+<td><strong>Friar stops getting paid.</strong> The key cannot reach user funds at all</td>
+</tr>
+<tr>
+<td><strong>The hook</strong></td>
+<td>set the dynamic swap fee, capped at 10%</td>
+<td>hold, move or approve tokens, or run at all while liquidity is being added or removed</td>
+<td>nothing. It has no owner and no keys</td>
+</tr>
+<tr>
+<td><strong>Friar</strong>, the team</td>
+<td>run servers, deploy new contracts you&#39;d have to opt into</td>
+<td>everything else. There&#39;s no admin function, no pause, no upgrade, no sweep</td>
+<td>the app goes offline. Positions keep working</td>
+</tr>
+</tbody></table></div>
+<h3 id="what-nothing-can-do">What nothing can do</h3>
+<ul>
+<li><strong>No function sends your funds anywhere but to you.</strong> Payout calls don&#39;t take a recipient
+argument. The address comes off the position record.</li>
+<li><strong>No pause, no upgrade, no proxy, no delegatecall.</strong> Both contracts are immutable.</li>
+<li><strong>The manager holds no idle balance.</strong> Funds go from your wallet into Uniswap and back in
+the same transaction. There&#39;s no pot sitting in the middle.</li>
+<li><strong>The fee rate can&#39;t be raised.</strong> The 5% rate is an immutable constructor value, under a
+hard 20% sanity cap.</li>
+<li><strong>The hook can&#39;t run when you deposit or withdraw.</strong> Its permissions have
+<code>beforeAddLiquidity</code>, <code>afterAddLiquidity</code>, <code>beforeRemoveLiquidity</code> and
+<code>afterRemoveLiquidity</code> all set to false, which is readable off the hook&#39;s address. It only
+fires on <code>afterInitialize</code> and <code>beforeSwap</code>.</li>
+<li><strong>The v4 callback can&#39;t be called by anyone else.</strong> <code>unlockCallback</code> reverts unless
+Uniswap&#39;s PoolManager is the caller.</li>
+<li><strong>Your exit doesn&#39;t need our servers.</strong> The whole position, owner and pool and every bin,
+is stored on-chain. The position id is all you need to withdraw.</li>
+</ul>
+<h2 id="the-complete-external-surface">The complete external surface</h2>
+<p>Thirteen functions. Counting the write functions on the explorer gives the same list.</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>open</code> <code>openNew</code></td>
+<td>mint your bins. <code>openNew</code> also creates the pool</td>
+</tr>
+<tr>
+<td><code>increase</code> <code>decrease</code></td>
+<td>add to or withdraw from your bins</td>
+</tr>
+<tr>
+<td><code>close</code> <code>collect</code></td>
+<td>exit fully, or take fees and leave the liquidity</td>
+</tr>
+<tr>
+<td><code>getPosition</code> <code>positionsOf</code> <code>binSalt</code></td>
+<td>views. read-only, callable by anyone</td>
+</tr>
+<tr>
+<td><code>unlockCallback</code></td>
+<td>Uniswap&#39;s callback. reverts for any other caller</td>
+</tr>
+<tr>
+<td><code>setTreasury</code> <code>acceptTreasury</code></td>
+<td>two-step handover of the revenue address</td>
+</tr>
+<tr>
+<td><code>setExempt</code> (on the shared <code>FeeExemptionRegistry</code>)</td>
+<td>discount only. can waive a fee, never raise one</td>
+</tr>
+</tbody></table></div>
+<p>All six position functions start with <code>if (p.owner != msg.sender) revert NotPositionOwner()</code>.
+The treasury functions start with <code>if (msg.sender != treasury) revert NotTreasury()</code>, and the
+registry&#39;s <code>setExempt</code> with its own admin check. That&#39;s the whole permission system.</p>
+<h2 id="what-39-s-still-worth-worrying-about">What&#39;s still worth worrying about</h2>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Why it&#39;s real</th>
+<th>What limits it</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A bug in the manager</strong></td>
+<td>Not audited, and immutable, so there&#39;s no pause and no way to claw anything back. This is the one that could actually cost you money.</td>
+<td>The surface is small, the source is public, and an exploit has to come through the same calls everyone else uses.</td>
+</tr>
+<tr>
+<td><strong>Token approvals</strong></td>
+<td>Zaps need an unlimited allowance to Uniswap&#39;s SwapRouter02, and it stays there after you close.</td>
+<td>That&#39;s Uniswap&#39;s router and it has been audited. The allowance you give the Friar manager has a ceiling on it. You can revoke either one whenever you want.</td>
+</tr>
+<tr>
+<td><strong>The token you pick</strong></td>
+<td>Providing liquidity means holding inventory. If the token falls you end up holding more of it, and no fee schedule fixes that.</td>
+<td>Nothing limits it. Friar prices the fee and reports the split; token selection is the LP&#39;s.</td>
+</tr>
+<tr>
+<td><strong>Our servers</strong></td>
+<td>Charts, PnL and history all come from an indexer. If it&#39;s down or behind, the numbers you&#39;re looking at are stale.</td>
+<td>You don&#39;t need any of it to move money. Withdrawing reads the chain.</td>
+</tr>
+</tbody></table></div>
+<h2 id="check-it-yourself">Check it yourself</h2>
+<p>The source is verified on the explorer, so you can read the actual code in the browser.</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Position manager</td>
+<td><a href="https://robinhoodchain.blockscout.com/address/0xBd76176c5524785452D80c4350f18e3A2040470E?tab=contract"><code>0xBd76176c5524785452D80c4350f18e3A2040470E</code></a></td>
+</tr>
+<tr>
+<td>Friar hook, standard</td>
+<td><a href="https://robinhoodchain.blockscout.com/address/0xFeDa24F0d3805170E7566cE617CfBa01cE05D080?tab=contract"><code>0xFeDa24F0d3805170E7566cE617CfBa01cE05D080</code></a></td>
+</tr>
+<tr>
+<td>Friar hook, calm</td>
+<td><a href="https://robinhoodchain.blockscout.com/address/0x5E6b0bbc811705b8d8234e9914c0507243fB1080?tab=contract"><code>0x5E6b0bbc811705b8d8234e9914c0507243fB1080</code></a></td>
+</tr>
+<tr>
+<td>Uniswap v4 PoolManager</td>
+<td><a href="https://robinhoodchain.blockscout.com/address/0x8366a39CC670B4001A1121B8F6A443A643e40951"><code>0x8366a39CC670B4001A1121B8F6A443A643e40951</code></a></td>
+</tr>
+<tr>
+<td>Source</td>
+<td><a href="https://github.com/josephtaylor/friar">github.com/josephtaylor/friar</a></td>
+</tr>
+</tbody></table></div>
+<p><strong>What to look for.</strong> Open the manager&#39;s contract tab and count the write functions. You
+should find six position verbs plus three treasury ones. Search the source for
+<code>NotPositionOwner</code>, <code>NotTreasury</code> and <code>NotPoolManager</code> to see the three checks doing the
+work. Then search for <code>selfdestruct</code>, <code>delegatecall</code>, <code>upgradeTo</code> and <code>pause</code>. None of them
+are in there.</p>
+<p>Uniswap reviewed the hook before adding it to their official hooklist, which is why their
+router quotes these pools.</p>
+
+    <div class="pagers">
+      <a class="pager prev" href="/docs/costs"><span>previous</span>What Friar charges</a>
+      <a class="pager next" href="/docs/range"><span>next</span>When it goes wrong</a>
+    </div>
+    <footer>
+      friar.fi · an independent project on Robinhood Chain, not affiliated with or endorsed
+      by Robinhood · nothing here is financial advice
+    </footer>
+  </main>
+</div>
+<script src="/beacon.js" defer></script>
+</body>
+</html>

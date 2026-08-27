@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "friar-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-07-01",
+  "observability": { "enabled": true },
+  "routes": [{ "pattern": "api.friar.fi", "custom_domain": true }],
+  // share-card assets (fonts + monk mascot) bundle as binary modules; the resvg wasm
+  // rides the built-in CompiledWasm rule
+  "rules": [{ "type": "Data", "globs": ["**/*.ttf", "**/*.png"], "fallthrough": true }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "friar",
+      "database_id": "68a5d0a8-b22e-4e11-964c-1426a9a4d187"
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Collecting fees · Friar docs</title>
+<meta name="description" content="Friar docs: a step-by-step guide to opening, reading, and closing a position, plus how the contracts work and where your funds sit." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<meta name="theme-color" content="#100c07" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Collecting fees · Friar docs" />
+<meta property="og:image" content="https://friar.fi/og.png?v=3" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="/docs/docs.css" />
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">FRIAR</a>
+  <nav class="top-links">
+    <a href="/docs/">docs</a>
+    <a href="https://discord.gg/wCjfVcq9C" target="_blank" rel="noreferrer">discord</a>
+    <a class="cta" href="https://app.friar.fi?ref=docs">launch app →</a>
+  </nav>
+</header>
+<div class="shell">
+  <aside class="side">
+    <div class="side-h">the docs</div>
+    <nav class="side-nav">
+        <a class="nav-item" href="/docs/">Overview</a>
+        <div class="side-sec">User guide</div>
+        <a class="nav-item" href="/docs/guide-start">Getting started</a>
+        <a class="nav-item" href="/docs/guide-tokens">The Tokens board</a>
+        <a class="nav-item" href="/docs/guide-pools">The Friar Pools page</a>
+        <a class="nav-item" href="/docs/opening">Opening a position</a>
+        <a class="nav-item" href="/docs/guide-position">Your position page</a>
+        <a class="nav-item active" href="/docs/guide-fees">Collecting fees</a>
+        <a class="nav-item" href="/docs/guide-close">Closing a position</a>
+        <a class="nav-item" href="/docs/guide-history">Positions & history</a>
+        <div class="side-sec">How it works</div>
+        <a class="nav-item" href="/docs/shapes">Positions & shapes</a>
+        <a class="nav-item" href="/docs/fees">How the fee is set</a>
+        <a class="nav-item" href="/docs/costs">What Friar charges</a>
+        <a class="nav-item" href="/docs/anatomy">Where your money sits</a>
+        <a class="nav-item" href="/docs/range">When it goes wrong</a>
+    </nav>
+  </aside>
+  <main class="doc">
+    <h1>Collecting fees</h1>
+<p>Fees accrue inside your bins as people trade through them. They sit there, uncollected, until
+you do something about it — collecting turns them from a number on a screen into tokens in your
+wallet.</p>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-position-actions.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-position-actions.png" decoding="async" width="1568" height="97" alt="The position action row with Claim fees highlighted among Share PnL, Close, and Close and zap to WETH." /></a></div>
+  <figcaption><b>Claim fees</b> takes the fees and leaves the liquidity exactly where it
+  is.</figcaption>
+</figure><h2 id="what-claim-fees-does">What Claim fees does</h2>
+<p>One transaction. It sweeps the accrued fees out of every bin, takes the performance fee, and
+sends the rest to you. <strong>Your liquidity isn&#39;t touched</strong> — the bins stay minted, the shape is
+unchanged, and the position keeps earning the moment the transaction lands.</p>
+<p>You get paid <strong>in kind</strong>: whatever the bins accrued. A position that&#39;s been trading in both
+directions pays out some of each token, not just the quote.</p>
+<p>The payout goes to the position&#39;s owner and nowhere else. The call takes no recipient
+argument — the address comes off the on-chain position record, so there&#39;s no version of this
+that sends your fees somewhere you didn&#39;t choose.</p>
+<h2 id="what-it-costs">What it costs</h2>
+<p>The performance fee is taken here, at collection, on-chain:</p>
+<ul>
+<li><strong>10%</strong> of fees earned on a shaped (multi-bin) position</li>
+<li><strong>1%</strong> on a simple (single-bin) one</li>
+</ul>
+<p><strong>Principal is never charged.</strong> Both rates are immutable constructor values on the manager,
+under a hard 20% cap that can&#39;t be raised by anyone, including us. <a href="/docs/costs">What Friar
+charges</a> has the full picture.</p>
+<p>The <code>Fees earned</code> tile on your position page is already <strong>net</strong> of this — it&#39;s what you&#39;d
+actually receive, not a gross number you have to discount.</p>
+<h2 id="when-to-collect">When to collect</h2>
+<p>There&#39;s no schedule and no automation. The tradeoffs:</p>
+<ul>
+<li><strong>Fees stop accruing the moment you go out of range.</strong> Collecting while you&#39;re in range
+realises them; leaving them uncollected while price runs away means they&#39;re still yours, but
+they&#39;ve stopped growing.</li>
+<li><strong>Uncollected fees are still marked.</strong> They show up in <code>Fees earned</code> and in your portfolio
+value whether or not you&#39;ve claimed them, so collecting doesn&#39;t change your PnL — it changes
+where the money sits.</li>
+<li><strong>Each collect costs gas.</strong> Cents on this chain, but it&#39;s not free, and collecting a dust
+amount is worth less than the transaction.</li>
+<li><strong>Closing collects everything anyway.</strong> If you&#39;re about to close, don&#39;t claim first — a
+<a href="/docs/guide-close">close</a> sweeps the fees in the same call.</li>
+</ul>
+<p>The honest summary: collect when the amount is worth banking, or when you want the tokens for
+something else. There&#39;s no penalty for leaving them, and no reward beyond getting them into
+your wallet.</p>
+<h2 id="after-collecting">After collecting</h2>
+<p>The page refreshes itself once the transaction confirms — the app pushes the transaction into
+the indexer directly rather than waiting for the polling loop to reach that block, so the tile
+updates in seconds rather than minutes.</p>
+<p>The claimed fees land in your wallet as the raw tokens. If you&#39;d rather hold the quote, sell
+them yourself, or use the sweeper on a closed position described in <a href="/docs/guide-close">closing a
+position</a>.</p>
+
+    <div class="pagers">
+      <a class="pager prev" href="/docs/guide-position"><span>previous</span>Your position page</a>
+      <a class="pager next" href="/docs/guide-close"><span>next</span>Closing a position</a>
+    </div>
+    <footer>
+      friar.fi · an independent project on Robinhood Chain, not affiliated with or endorsed
+      by Robinhood · nothing here is financial advice
+    </footer>
+  </main>
+</div>
+<script src="/beacon.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>How the fee is set · Friar docs</title>
+<meta name="description" content="Friar docs: a step-by-step guide to opening, reading, and closing a position, plus how the contracts work and where your funds sit." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<meta name="theme-color" content="#100c07" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="How the fee is set · Friar docs" />
+<meta property="og:image" content="https://friar.fi/og.png?v=3" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="/docs/docs.css" />
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">FRIAR</a>
+  <nav class="top-links">
+    <a href="/docs/">docs</a>
+    <a href="https://discord.gg/wCjfVcq9C" target="_blank" rel="noreferrer">discord</a>
+    <a class="cta" href="https://app.friar.fi?ref=docs">launch app →</a>
+  </nav>
+</header>
+<div class="shell">
+  <aside class="side">
+    <div class="side-h">the docs</div>
+    <nav class="side-nav">
+        <a class="nav-item" href="/docs/">Overview</a>
+        <div class="side-sec">User guide</div>
+        <a class="nav-item" href="/docs/guide-start">Getting started</a>
+        <a class="nav-item" href="/docs/guide-tokens">The Tokens board</a>
+        <a class="nav-item" href="/docs/guide-pools">The Friar Pools page</a>
+        <a class="nav-item" href="/docs/opening">Opening a position</a>
+        <a class="nav-item" href="/docs/guide-position">Your position page</a>
+        <a class="nav-item" href="/docs/guide-fees">Collecting fees</a>
+        <a class="nav-item" href="/docs/guide-close">Closing a position</a>
+        <a class="nav-item" href="/docs/guide-history">Positions & history</a>
+        <div class="side-sec">How it works</div>
+        <a class="nav-item" href="/docs/shapes">Positions & shapes</a>
+        <a class="nav-item active" href="/docs/fees">How the fee is set</a>
+        <a class="nav-item" href="/docs/costs">What Friar charges</a>
+        <a class="nav-item" href="/docs/anatomy">Where your money sits</a>
+        <a class="nav-item" href="/docs/range">When it goes wrong</a>
+    </nav>
+  </aside>
+  <main class="doc">
+    <h1>How the fee is set</h1>
+<p>A Friar pool recomputes the swap fee on every swap, from how far price has moved recently. It
+has two parts: a base fee fixed by the pool&#39;s configuration, and a variable part driven by
+realised volatility.</p>
+<figure>
+  <div class="frame"><a class="zoom" href="/docs/img/fee-curve.png" target="_blank" rel="noreferrer" title="open full size"><svg class="diagram" role="img" aria-label="Chart: the fee sits flat at a 0.80% base while the market is calm, spikes near-vertically to the 10% cap when price runs, then steps back down as each quiet swap halves the surge. A dashed line marks 1% for scale." xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#cf9440" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#cf9440" stop-opacity="0.02"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="#100c07"/>
+
+  <text x="64" y="78" text-anchor="start" font-family="IBM Plex Mono" font-size="32" font-weight="600" fill="#cf9440" letter-spacing="9">FRIAR</text>
+  <text x="1536" y="76" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#8a7a5f" letter-spacing="3">THE DYNAMIC FEE</text>
+  <line x1="64" y1="108" x2="1536" y2="108" stroke="#2a2012"/>
+  <text x="64" y="172" text-anchor="start" font-family="IBM Plex Sans" font-size="46" font-weight="600" fill="#ece3d2">The fee reprices on every swap</text>
+  <text x="64" y="214" text-anchor="start" font-family="IBM Plex Sans" font-size="21" font-weight="400" fill="#8a7a5f">Low while the market is calm, climbing with how far price has just moved, decaying back when it</text>
+  <text x="64" y="242" text-anchor="start" font-family="IBM Plex Sans" font-size="21" font-weight="400" fill="#8a7a5f">stops. The dashed line marks 1%, a common static fee tier, for scale.</text>
+
+  <line x1="142" y1="300.0" x2="1536" y2="300.0" stroke="#2a2012"/>
+       <text x="126" y="306" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#e05d52">10%  cap</text><line x1="142" y1="510.0" x2="1536" y2="510.0" stroke="#2a2012"/>
+       <text x="126" y="516" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#8a7a5f">5%</text><line x1="142" y1="594.0" x2="1536" y2="594.0" stroke="#2a2012"/>
+       <text x="126" y="600" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#8a7a5f">3%</text><line x1="142" y1="678.0" x2="1536" y2="678.0" stroke="#2a2012"/>
+       <text x="126" y="684" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#8a7a5f">1%</text><line x1="142" y1="720.0" x2="1536" y2="720.0" stroke="#2a2012"/>
+       <text x="126" y="726" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#8a7a5f">0%</text>
+
+  <!-- the 1% gridline, drawn dashed, as a familiar reference height -->
+  <line x1="142" y1="678.0" x2="1536" y2="678.0" stroke="#8a7a5f" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="1536" y="664" text-anchor="end" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">1% static tier</text>
+
+  <path d="M142.0,686.4 L188.5,686.4 L188.5,686.4 L234.9,686.4 L234.9,686.4 L281.4,686.4 L281.4,686.4 L327.9,686.4 L327.9,686.4 L374.3,686.4 L374.3,686.4 L420.8,686.4 L420.8,686.4 L423.9,686.4 L423.9,682.1 L427.0,682.1 L427.0,669.2 L430.1,669.2 L430.1,647.7 L433.2,647.7 L433.2,647.7 L436.3,647.7 L436.3,617.6 L439.4,617.6 L439.4,578.9 L442.5,578.9 L442.5,531.6 L445.6,531.6 L445.6,475.7 L448.7,475.7 L448.7,411.1 L451.8,411.1 L451.8,411.1 L454.9,411.1 L454.9,338.0 L458.0,338.0 L458.0,300.0 L461.1,300.0 L461.1,300.0 L464.2,300.0 L464.2,300.0 L467.3,300.0 L467.3,300.0 L470.4,300.0 L470.4,300.0 L473.5,300.0 L473.5,300.0 L476.6,300.0 L476.6,300.0 L479.7,300.0 L479.7,300.0 L482.8,300.0 L482.8,300.0 L485.9,300.0 L485.9,300.0 L489.0,300.0 L489.0,300.0 L492.0,300.0 L492.0,300.0 L495.1,300.0 L495.1,300.0 L498.2,300.0 L498.2,300.0 L501.3,300.0 L501.3,300.0 L504.4,300.0 L504.4,300.0 L507.5,300.0 L507.5,300.0 L510.6,300.0 L510.6,300.0 L513.7,300.0 L513.7,300.0 L560.2,300.0 L560.2,300.0 L606.7,300.0 L606.7,518.4 L653.1,518.4 L653.1,644.4 L699.6,644.4 L699.6,675.9 L746.1,675.9 L746.1,683.8 L792.5,683.8 L792.5,685.7 L839.0,685.7 L839.0,686.2 L885.5,686.2 L885.5,686.4 L931.9,686.4 L931.9,686.4 L978.4,686.4 L978.4,686.4 L1024.9,686.4 L1024.9,686.4 L1071.3,686.4 L1071.3,686.4 L1117.8,686.4 L1117.8,686.4 L1164.3,686.4 L1164.3,686.4 L1210.7,686.4 L1210.7,686.4 L1257.2,686.4 L1257.2,686.4 L1303.7,686.4 L1303.7,686.4 L1350.1,686.4 L1350.1,686.4 L1396.6,686.4 L1396.6,686.4 L1443.1,686.4 L1443.1,686.4 L1489.5,686.4 L1489.5,686.4 L1536.0,686.4 L1536.0,686.4 L1536.0,720 L142.0,720 Z" fill="url(#fill)"/>
+  <path d="M142.0,686.4 L188.5,686.4 L188.5,686.4 L234.9,686.4 L234.9,686.4 L281.4,686.4 L281.4,686.4 L327.9,686.4 L327.9,686.4 L374.3,686.4 L374.3,686.4 L420.8,686.4 L420.8,686.4 L423.9,686.4 L423.9,682.1 L427.0,682.1 L427.0,669.2 L430.1,669.2 L430.1,647.7 L433.2,647.7 L433.2,647.7 L436.3,647.7 L436.3,617.6 L439.4,617.6 L439.4,578.9 L442.5,578.9 L442.5,531.6 L445.6,531.6 L445.6,475.7 L448.7,475.7 L448.7,411.1 L451.8,411.1 L451.8,411.1 L454.9,411.1 L454.9,338.0 L458.0,338.0 L458.0,300.0 L461.1,300.0 L461.1,300.0 L464.2,300.0 L464.2,300.0 L467.3,300.0 L467.3,300.0 L470.4,300.0 L470.4,300.0 L473.5,300.0 L473.5,300.0 L476.6,300.0 L476.6,300.0 L479.7,300.0 L479.7,300.0 L482.8,300.0 L482.8,300.0 L485.9,300.0 L485.9,300.0 L489.0,300.0 L489.0,300.0 L492.0,300.0 L492.0,300.0 L495.1,300.0 L495.1,300.0 L498.2,300.0 L498.2,300.0 L501.3,300.0 L501.3,300.0 L504.4,300.0 L504.4,300.0 L507.5,300.0 L507.5,300.0 L510.6,300.0 L510.6,300.0 L513.7,300.0 L513.7,300.0 L560.2,300.0 L560.2,300.0 L606.7,300.0 L606.7,518.4 L653.1,518.4 L653.1,644.4 L699.6,644.4 L699.6,675.9 L746.1,675.9 L746.1,683.8 L792.5,683.8 L792.5,685.7 L839.0,685.7 L839.0,686.2 L885.5,686.2 L885.5,686.4 L931.9,686.4 L931.9,686.4 L978.4,686.4 L978.4,686.4 L1024.9,686.4 L1024.9,686.4 L1071.3,686.4 L1071.3,686.4 L1117.8,686.4 L1117.8,686.4 L1164.3,686.4 L1164.3,686.4 L1210.7,686.4 L1210.7,686.4 L1257.2,686.4 L1257.2,686.4 L1303.7,686.4 L1303.7,686.4 L1350.1,686.4 L1350.1,686.4 L1396.6,686.4 L1396.6,686.4 L1443.1,686.4 L1443.1,686.4 L1489.5,686.4 L1489.5,686.4 L1536.0,686.4 L1536.0,686.4" fill="none" stroke="#cf9440" stroke-width="3" stroke-linejoin="round"/>
+
+  <!-- annotations -->
+  <text x="281.4" y="664.4" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">calm: 0.80% base</text>
+  <circle cx="458.0" cy="300.0" r="6" fill="#cf9440"/>
+  <text x="479.9733333333333" y="334" text-anchor="start" font-family="IBM Plex Mono" font-size="19" font-weight="400" fill="#ece3d2">price runs → fee hits the 10% cap</text>
+  <text x="808.0222222222222" y="610.8" text-anchor="start" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">each quiet swap halves the surge</text>
+
+  <line x1="142" y1="720" x2="1536" y2="720" stroke="#463620"/>
+  <text x="142" y="754" text-anchor="start" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#5d5138">0</text>
+  <text x="839" y="754" text-anchor="middle" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#5d5138">time →   (about 15 minutes)</text>
+  <text x="1536" y="754" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#5d5138">15m</text>
+
+  <!-- the parameters that produced this curve -->
+  <text x="64" y="782" text-anchor="start" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#5d5138">standard hook · baseFactor 5000 · filterPeriod 10s · decayPeriod 600s · reductionFactor 50% · variableFeeControl 40000 · cap 10%</text>
+  <text x="64" y="808" text-anchor="start" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#5d5138">base fee = baseFactor × tickSpacing, so 0.80% at the 160 spacing this curve uses</text>
+
+  <line x1="64" y1="826" x2="1536" y2="826" stroke="#2a2012"/>
+  <text x="64" y="864" text-anchor="start" font-family="IBM Plex Mono" font-size="22" font-weight="400" fill="#cf9440" letter-spacing="2">friar.fi</text>
+  <text x="1536" y="864" text-anchor="end" font-family="IBM Plex Mono" font-size="19" font-weight="400" fill="#5d5138">Robinhood Chain · 4663</text>
+</svg></a></div>
+  <figcaption>Simulated with the real math and the deployed parameters, not drawn freehand.
+  Flat at base, a near-vertical climb when price runs, then a staircase down as each quiet
+  swap applies the 50% reduction.</figcaption>
+</figure><h2 id="the-two-parts">The two parts</h2>
+<pre><code>base     = the pool&#39;s fixed base fee (set by which fee tier it belongs to)
+variable = (volatilityAccumulator × tickSpacing)² × variableFeeControl / 100
+fee      = min(base + variable, 10%)
+</code></pre>
+<p><strong>The base is a property of the pool, not of Friar, and it is part of the pool&#39;s identity.</strong>
+Each base fee is its own immutable hook, so a pool&#39;s base fee is fixed the moment it is
+created and can never be retuned. When you create a pool you pick a <strong>fee tier</strong>:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>fee tier</th>
+<th>base fee</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0.30%</td>
+<td>0.30%</td>
+</tr>
+<tr>
+<td>0.80%</td>
+<td>0.80%</td>
+</tr>
+<tr>
+<td>1%</td>
+<td>1%</td>
+</tr>
+<tr>
+<td>2%</td>
+<td>2%</td>
+</tr>
+<tr>
+<td>5%</td>
+<td>5%</td>
+</tr>
+</tbody></table></div>
+<p>Base fee is <strong>independent of bin width</strong>. The same pair can have a 5% pool at 1%-wide bins and
+a 5% pool at 3.3%-wide bins, and they are different pools; likewise a 0.30% and a 5% pool at
+the same bin width. (This is the model Meteora LPs know: pick your fee, pick your granularity,
+each combination is its own pool.) Older Friar pools set base fee from bin width instead — a
+frozen <code>baseFactor × tickSpacing</code> — and still work; the fee tiers are how new pools are made.</p>
+<p>The variable part is <strong>quadratic</strong> in the accumulator, so small movements barely move the fee
+and large ones escalate it quickly. The total is capped at 10%.</p>
+<h2 id="the-volatility-accumulator">The volatility accumulator</h2>
+<p>The mechanism comes from LFJ&#39;s Liquidity Book (<code>joe-v2</code>, MIT). It is a state machine that
+tracks how far price has moved since the pool was last quiet.</p>
+<ul>
+<li>Price is tracked in buckets, one bucket per <code>tickSpacing</code>. Every bucket price has moved away
+from its reference adds to the score.</li>
+<li>If the pool has been quiet for the <strong>filter period</strong> (10 seconds), the reference re-anchors
+to the current price and the score is cut by the <strong>reduction factor</strong> (50%).</li>
+<li>After a full <strong>decay period</strong> (10 minutes) of quiet, it&#39;s back to zero.</li>
+<li>The score is capped, so the fee can&#39;t run away.</li>
+</ul>
+<p>The accumulator measures <strong>swap-to-swap gaps, not wall clock time</strong>. During heavy trading the
+gaps are short, the reference does not re-anchor, and the score builds across the whole move.
+When trading thins out, each swap re-anchors and halves it, which is the staircase in the chart
+above.</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>baseFeePips</code></td>
+<td>0.3 / 0.8 / 1 / 2 / 5%</td>
+<td>the base fee — one immutable hook per tier</td>
+</tr>
+<tr>
+<td><code>filterPeriod</code></td>
+<td>10s</td>
+<td>quiet gap before the reference re-anchors</td>
+</tr>
+<tr>
+<td><code>decayPeriod</code></td>
+<td>600s</td>
+<td>quiet gap for the surge to fully reset</td>
+</tr>
+<tr>
+<td><code>reductionFactor</code></td>
+<td>50%</td>
+<td>how much of the score survives each re-anchor</td>
+</tr>
+<tr>
+<td><code>variableFeeControl</code></td>
+<td>40000</td>
+<td>surge steepness</td>
+</tr>
+<tr>
+<td><code>maxVolatilityTicks</code></td>
+<td>7000</td>
+<td>the price move at which the surge saturates</td>
+</tr>
+</tbody></table></div>
+<p>Every fee-tier hook shares these surge parameters and differs only in its base fee. They are
+all immutable, so a pool&#39;s fee behaviour is fixed at creation and no one, including us, can
+change it afterward. The surge ceiling is expressed in <strong>ticks</strong> of price movement (not bin
+units), so it saturates at the same price move whatever bin width the pool uses.</p>
+<h2 id="what-it-looks-like-on-a-pool">What it looks like on a pool</h2>
+<p>On a pool with steady memecoin flow, the fee spends most of its time at or near base, with the
+surge concentrated in short windows. Typical behaviour over a day of trading:</p>
+<ul>
+<li>the volume-weighted average fee sits modestly <strong>above</strong> the base, since most swaps arrive
+while the pool is calm</li>
+<li>the peak reaches the 10% cap during the sharpest moves</li>
+<li>a minority of swaps, in the region of one in ten, arrive while the fee is already above 1%</li>
+</ul>
+<p>The last one is the part that decides how much the surge is worth. Each pool&#39;s fee history is
+recorded per five-minute bucket, so the average and the peak for any given pool are visible in
+the app rather than estimated.</p>
+<h2 id="reading-it-live">Reading it live</h2>
+<p>The hook exposes <code>previewFee(poolKey)</code>, a read-only view of the exact fee the next swap would
+pay. The app uses it for the live fee gauge, and anyone can call it.</p>
+<p>One deviation from Liquidity Book worth stating: LB escalates the fee <em>within</em> a single swap as
+it crosses bins. A <code>beforeSwap</code> hook prices each swap from movement observed <strong>before</strong> it, so
+the swap that causes a big move pays the pre-move fee and the surge lands on everything after
+it. Since the reference doesn&#39;t re-anchor inside the filter window, the movement isn&#39;t lost,
+just priced one swap late. In practice the followers are the arbitrage flow the fee exists to
+charge.</p>
+
+    <div class="pagers">
+      <a class="pager prev" href="/docs/shapes"><span>previous</span>Positions & shapes</a>
+      <a class="pager next" href="/docs/costs"><span>next</span>What Friar charges</a>
+    </div>
+    <footer>
+      friar.fi · an independent project on Robinhood Chain, not affiliated with or endorsed
+      by Robinhood · nothing here is financial advice
+    </footer>
+  </main>
+</div>
+<script src="/beacon.js" defer></script>
+</body>
+</html>

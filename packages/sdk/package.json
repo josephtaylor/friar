@@ -1,0 +1,58 @@
+{
+  "name": "@josephtaylor/friar-sdk",
+  "version": "0.7.0",
+  "private": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  },
+  "description": "TypeScript SDK for Friar: a dynamic-fee LP venue and position manager on Robinhood Chain (4663). Reads, position planning, unsigned transaction builders, and the underlying bin math.",
+  "license": "MIT",
+  "author": "J. Taylor O'Connor",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/josephtaylor/friar.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://friar.fi",
+  "keywords": [
+    "friar",
+    "robinhood-chain",
+    "uniswap-v4",
+    "liquidity",
+    "lp",
+    "dlmm",
+    "defi",
+    "mcp"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "@friar/chain": "*",
+    "@friar/core": "*"
+  }
+}

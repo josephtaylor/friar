@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Opening a position · Friar docs</title>
+<meta name="description" content="Friar docs: a step-by-step guide to opening, reading, and closing a position, plus how the contracts work and where your funds sit." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<meta name="theme-color" content="#100c07" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Opening a position · Friar docs" />
+<meta property="og:image" content="https://friar.fi/og.png?v=3" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="/docs/docs.css" />
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">FRIAR</a>
+  <nav class="top-links">
+    <a href="/docs/">docs</a>
+    <a href="https://discord.gg/wCjfVcq9C" target="_blank" rel="noreferrer">discord</a>
+    <a class="cta" href="https://app.friar.fi?ref=docs">launch app →</a>
+  </nav>
+</header>
+<div class="shell">
+  <aside class="side">
+    <div class="side-h">the docs</div>
+    <nav class="side-nav">
+        <a class="nav-item" href="/docs/">Overview</a>
+        <div class="side-sec">User guide</div>
+        <a class="nav-item" href="/docs/guide-start">Getting started</a>
+        <a class="nav-item" href="/docs/guide-tokens">The Tokens board</a>
+        <a class="nav-item" href="/docs/guide-pools">The Friar Pools page</a>
+        <a class="nav-item active" href="/docs/opening">Opening a position</a>
+        <a class="nav-item" href="/docs/guide-position">Your position page</a>
+        <a class="nav-item" href="/docs/guide-fees">Collecting fees</a>
+        <a class="nav-item" href="/docs/guide-close">Closing a position</a>
+        <a class="nav-item" href="/docs/guide-history">Positions & history</a>
+        <div class="side-sec">How it works</div>
+        <a class="nav-item" href="/docs/shapes">Positions & shapes</a>
+        <a class="nav-item" href="/docs/fees">How the fee is set</a>
+        <a class="nav-item" href="/docs/costs">What Friar charges</a>
+        <a class="nav-item" href="/docs/anatomy">Where your money sits</a>
+        <a class="nav-item" href="/docs/range">When it goes wrong</a>
+    </nav>
+  </aside>
+  <main class="doc">
+    <h1>Opening a position</h1>
+<p>The open screen is one form. Chart on the left for price context, controls on the right, and a
+bin preview in the middle of them that redraws as you type. Nothing is committed until you sign
+— you can sit on this screen with no wallet connected and watch the shape change.</p>
+<figure>
+  <div class="frame shot narrow"><a class="zoom" href="/docs/img/ui-open-form.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-open-form.png" decoding="async" width="569" height="1568" alt="The full Friar open-position panel: a token/pool field, a WETH/USDG quote toggle, a live bin preview, Shaped/Simple and Spot/Curve/Bid-Ask selectors, percent below and above inputs with presets, a deposit toggle, amount fields, balance and gas checks, a summary block, and an Open position button." /></a></div>
+  <figcaption>The whole panel, top to bottom. The rest of this page walks down it.</figcaption>
+</figure><h2 id="1-pick-the-pool">1. Pick the pool</h2>
+<figure>
+  <div class="frame shot narrow"><a class="zoom" href="/docs/img/ui-open-pool.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-open-pool.png" decoding="async" width="748" height="406" alt="The top of the open form: a TOKEN / POOL field holding a pasted contract address, a line underneath confirming the resolved token, its decimals, and that a Friar pool is live, and a market stats box with 24h volume, liquidity, market cap, 24h change, fee/TVL and the incumbent venue's fee." /></a></div>
+  <figcaption>Paste anything that identifies the pair; the lines underneath tell you what it
+  resolved to and how the token is trading right now.</figcaption>
+</figure><p>The top field takes a <strong>token address, a v4 pool id, a v3 pair address, or a Dexscreener
+link</strong> and resolves it. Arriving from the Tokens board fills it for you.</p>
+<p><strong>Quote</strong> picks the other side of the pair, WETH or USDG. Stock tokens are USDG-quoted; almost
+everything else is WETH. If you pasted a specific pool, the quote is whatever that pool uses
+and the toggle disappears.</p>
+<p><strong>Pool.</strong> Once the pair is set, a dropdown lists every Friar pool that already exists for it,
+each labelled by its fee tier and bin width, deepest first. Pick one to <strong>join</strong> it — you&#39;re
+adding liquidity to a pool that&#39;s already there. The default is the deepest, which is usually
+where you want to be, since depth is what routes flow. The last option is <strong>Create a new
+pool</strong>, for when you want a fee or width that doesn&#39;t exist yet.</p>
+<figure>
+  <div class="frame shot narrow"><a class="zoom" href="/docs/img/ui-open-join.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-open-join.png" decoding="async" width="748" height="236" alt="The POOL dropdown showing an existing pool selected, labelled 1% base and 1.0% bins, with a note underneath: joining an existing pool, pick Create a new pool to open a different fee tier or width." /></a></div>
+  <figcaption>Joining. The dropdown names each existing pool by what it charges and how
+  finely it's binned.</figcaption>
+</figure><p>Choosing <em>Create a new pool</em> reveals two more controls:</p>
+<figure>
+  <div class="frame shot narrow"><a class="zoom" href="/docs/img/ui-open-create.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-open-create.png" decoding="async" width="724" height="346" alt="The POOL dropdown set to Create a new pool, revealing a FEE TIER picker showing 1% base fee and a BIN WIDTH picker showing 1.0% bins, with a note: new pool, you'll be the first LP; fee tier is the base fee; each fee tier and bin width is its own pool." /></a></div>
+  <figcaption>Creating. Fee tier and bin width together name exactly one pool, and you'll be
+  its first LP.</figcaption>
+</figure><ul>
+<li><strong>Fee tier</strong> — the pool&#39;s base fee: 0.3%, 0.8%, 1%, 2%, or 5%. Each is a separate,
+immutable pool, so this is what your pool <em>is</em>, not a setting you can change later. Higher
+tiers earn more per trade but see less flow; volatile launches often run high.</li>
+<li><strong>Bin width</strong> — how finely liquidity is placed, from tight (0.5%) to wide (3.3%). Tighter
+concentrates more but needs a narrower range; wider covers more ground.</li>
+</ul>
+<p>Fee tier and bin width are independent — any fee at any width is its own pool — so the two
+together name exactly one pool. You&#39;ll be its first LP, and creating it is bundled into the
+same transaction as your position.</p>
+<blockquote>
+<p>Two things get refused outright: tokens the safety checkers flag as honeypot, can&#39;t-sell or
+ruggable, and pools whose hook has permission to run on liquidity <strong>removal</strong> — a hook that
+can run on your way out can block or tax the exit.</p>
+</blockquote>
+<h2 id="2-shaped-or-simple">2. Shaped or Simple</h2>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-simple.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-simple.png" decoding="async" width="770" height="432" alt="The Simple option selected, showing one solid block of liquidity spanning the whole range instead of individual bins." /></a></div>
+  <figcaption>Simple is one Uniswap range, drawn flat across the whole span. One bin, one
+  position.</figcaption>
+</figure><ul>
+<li><strong>Shaped</strong> cuts the range into bins and distributes liquidity across them according to a
+shape. This is the DLMM behaviour.</li>
+<li><strong>Simple</strong> is a single Uniswap range — no bins, no shape, flat across your span.</li>
+</ul>
+<p>Both are priced the same — a flat 5% of fees earned — so the choice is about behaviour, not
+cost. <a href="/docs/costs">What Friar charges</a> has the detail.</p>
+<h2 id="3-shape">3. Shape</h2>
+<p>Shaped positions pick one of three distributions. Each answers &quot;where in the range do I want my
+liquidity concentrated&quot;.</p>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-shape-spot.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-shape-spot.png" decoding="async" width="770" height="598" alt="Spot shape preview: every bin the same height, an even block of liquidity across the range." /></a></div>
+  <figcaption><b>Spot</b> — flat. Every bin gets the same liquidity. The neutral choice, and
+  the one that behaves most like an ordinary concentrated range.</figcaption>
+</figure><figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-shape-curve.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-shape-curve.png" decoding="async" width="770" height="598" alt="Curve shape preview: bins tallest next to the current price and tapering away in both directions." /></a></div>
+  <figcaption><b>Curve</b> — concentrated at the middle. Most of the capital sits next to the
+  current price, where the volume is. Earns hardest while price stays put, converts fastest
+  when it doesn't.</figcaption>
+</figure><figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-shape-bidask.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-shape-bidask.png" decoding="async" width="770" height="598" alt="Bid-Ask shape preview: bins tallest at both far edges of the range and thinnest in the middle." /></a></div>
+  <figcaption><b>Bid-Ask</b> — concentrated at the edges. Buys hardest at the bottom, sells
+  hardest at the top, does least in the middle. The mean-reversion shape.</figcaption>
+</figure><p><a href="/docs/shapes">Positions, bins and shapes</a> covers what these are underneath.</p>
+<h2 id="4-range">4. Range</h2>
+<p><strong>% below</strong> and <strong>% above</strong> set the span, as percentages of the current price. They aren&#39;t
+symmetric by default and they don&#39;t need to be:</p>
+<ul>
+<li><strong>Below is bids</strong> — quote token, waiting to buy on the way down.</li>
+<li><strong>Above is asks</strong> — the token itself, waiting to sell on the way up.</li>
+</ul>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-open-preview.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-open-preview.png" decoding="async" width="770" height="322" alt="A bin preview chart showing orange WETH bid bins to the left of the current price, a pale active bin, and green token ask bins to the right, with the range marked minus 31 percent to plus 12 percent." /></a></div>
+  <figcaption>The preview redraws as you type. Orange is quote waiting to buy, green is token
+  waiting to sell, and pale is the bin the price is sitting in right now.</figcaption>
+</figure><p>A one-sided range only needs one token. <code>50 / 0</code> is a pure bid ladder that never needs you to
+hold the token at all, which makes it the cheapest thing to open — no swap leg, nothing to
+route.</p>
+<p>The preset pills below the inputs are shortcuts: <code>±5%</code>, <code>±10%</code>, <code>30 / 10</code>, <code>wide</code> (±50%), and
+<code>binchicken</code> (40 below, 8 above, Bid-Ask). Bins are capped at <strong>100</strong> — wider ranges spend that
+budget on span rather than granularity.</p>
+<blockquote>
+<p>If your range is far from where the market actually is, the app says so rather than letting
+you anchor a fresh position at a stale price. On a pool nothing has traded in a while, that&#39;s
+a real hazard — and if the pool is one of ours, the open will offer to slide it to market
+first and show you the cost before you commit.</p>
+</blockquote>
+<h2 id="5-deposit">5. Deposit</h2>
+<p><strong>Zap from WETH</strong> takes one token and buys whatever the ask side needs inside the transaction.
+<strong>Both tokens</strong> takes exactly what you supply, and swaps nothing.</p>
+<p>With a zap, <strong>wing % → asks</strong> controls how much of your deposit gets converted to the token for
+the upper bins. Leave it alone if you don&#39;t have a view; it&#39;s sized to your range by default.
+With <strong>Simple</strong>, the token side is computed for you and there&#39;s nothing to set.</p>
+<p>Then the amount. Three checks run underneath it and all three have to pass:</p>
+<ul>
+<li>your <strong>quote balance</strong> — including &quot;will wrap N ETH first ✓&quot; when you&#39;re short WETH but long
+ETH</li>
+<li>your <strong>token balance</strong>, when you&#39;re supplying both sides</li>
+<li>your <strong>gas</strong> — ETH on chain 4663, which a wallet that arrived holding only WETH won&#39;t have</li>
+</ul>
+<p>The submit button reports these directly rather than letting you reach a wallet prompt you can
+only reject. <em>&quot;Open position: no ETH for gas&quot;</em> is a disabled button, not a failure.</p>
+<h2 id="6-read-the-summary">6. Read the summary</h2>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-open-summary.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-open-summary.png" decoding="async" width="750" height="312" alt="The open summary: bins 36 bid / 10 ask, pays at most 0.1010 WETH, wing swap in-tx 0.0080 WETH min-out guarded, dynamic fee now 0.00%, and a note that the 5% fee applies to fees earned, charged on-chain at collection, and principal is never touched." /></a></div>
+  <figcaption>The last thing before you sign. "Pays at most" is a real cap enforced
+  on-chain.</figcaption>
+</figure><div class="tbl"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>bins</strong></td>
+<td>how the shape came out — <code>23 bid / 6 ask</code>, or <code>single range (1 bin)</code> for Simple</td>
+</tr>
+<tr>
+<td><strong>pays at most</strong></td>
+<td>the ceiling on what leaves your wallet. Enforced by the contract, not a display</td>
+</tr>
+<tr>
+<td><strong>wing swap in-tx</strong></td>
+<td>the zap leg, if there is one, with a min-out guard on it</td>
+</tr>
+<tr>
+<td><strong>dynamic fee now</strong></td>
+<td>what the pool is charging swappers <em>at this moment</em>. It moves — see <a href="/docs/fees">how the fee is set</a></td>
+</tr>
+</tbody></table></div>
+<p>Below it, the fee disclosure: 5% of fees earned, charged on-chain at collection, principal
+never touched.</p>
+<h2 id="7-sign">7. Sign</h2>
+<p>What you sign depends on your wallet.</p>
+<ul>
+<li><strong>Wallets that support atomic batching (EIP-5792)</strong> get one signature for the whole thing:
+wrap if needed, approvals, the swap leg, and the mint.</li>
+<li><strong>Everything else</strong> gets a guided stepper — one narrated transaction at a time, each with a
+label saying what it&#39;s for, and a retry on the step that failed rather than a restart.</li>
+</ul>
+<p>The note under the button tells you which one you&#39;re getting before you press it.</p>
+<p>Two approvals are worth knowing about. The allowance to the <strong>Friar manager is capped</strong> at what
+the position needs, not unlimited. The allowance to <strong>Uniswap&#39;s SwapRouter02</strong>, used for zaps,
+is unlimited and persists after you close, because re-approving on every open is worse. That&#39;s
+Uniswap&#39;s own router rather than ours, and you can revoke it whenever you like.</p>
+<h2 id="after-it-lands">After it lands</h2>
+<p>The position page opens as soon as the transaction confirms. It reads the chain directly, so it
+shows up immediately even if the indexer hasn&#39;t caught the event yet, and the history fills in
+behind it.</p>
+<p>Next: <a href="/docs/guide-position">your position page</a>.</p>
+
+    <div class="pagers">
+      <a class="pager prev" href="/docs/guide-pools"><span>previous</span>The Friar Pools page</a>
+      <a class="pager next" href="/docs/guide-position"><span>next</span>Your position page</a>
+    </div>
+    <footer>
+      friar.fi · an independent project on Robinhood Chain, not affiliated with or endorsed
+      by Robinhood · nothing here is financial advice
+    </footer>
+  </main>
+</div>
+<script src="/beacon.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Friar Pools page · Friar docs</title>
+<meta name="description" content="Friar docs: a step-by-step guide to opening, reading, and closing a position, plus how the contracts work and where your funds sit." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<meta name="theme-color" content="#100c07" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="The Friar Pools page · Friar docs" />
+<meta property="og:image" content="https://friar.fi/og.png?v=3" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="/docs/docs.css" />
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">FRIAR</a>
+  <nav class="top-links">
+    <a href="/docs/">docs</a>
+    <a href="https://discord.gg/wCjfVcq9C" target="_blank" rel="noreferrer">discord</a>
+    <a class="cta" href="https://app.friar.fi?ref=docs">launch app →</a>
+  </nav>
+</header>
+<div class="shell">
+  <aside class="side">
+    <div class="side-h">the docs</div>
+    <nav class="side-nav">
+        <a class="nav-item" href="/docs/">Overview</a>
+        <div class="side-sec">User guide</div>
+        <a class="nav-item" href="/docs/guide-start">Getting started</a>
+        <a class="nav-item" href="/docs/guide-tokens">The Tokens board</a>
+        <a class="nav-item active" href="/docs/guide-pools">The Friar Pools page</a>
+        <a class="nav-item" href="/docs/opening">Opening a position</a>
+        <a class="nav-item" href="/docs/guide-position">Your position page</a>
+        <a class="nav-item" href="/docs/guide-fees">Collecting fees</a>
+        <a class="nav-item" href="/docs/guide-close">Closing a position</a>
+        <a class="nav-item" href="/docs/guide-history">Positions & history</a>
+        <div class="side-sec">How it works</div>
+        <a class="nav-item" href="/docs/shapes">Positions & shapes</a>
+        <a class="nav-item" href="/docs/fees">How the fee is set</a>
+        <a class="nav-item" href="/docs/costs">What Friar charges</a>
+        <a class="nav-item" href="/docs/anatomy">Where your money sits</a>
+        <a class="nav-item" href="/docs/range">When it goes wrong</a>
+    </nav>
+  </aside>
+  <main class="doc">
+    <h1>The Friar Pools page</h1>
+<p>The Tokens board is &quot;what could I LP.&quot; The <strong>Friar Pools</strong> page is the other question:
+&quot;where is Friar&#39;s liquidity now.&quot; It lists Friar&#39;s own pools — the ones people have actually
+opened positions in — ranked by how much value is locked in each.</p>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-pools.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-pools.png" decoding="async" width="1568" height="504" alt="The Friar Pools page: a total value locked banner, then a table of pools with one row per pool showing the pair, its base fee and bin width, TVL, 24h volume, fee/TVL, LP count, and an Open button." /></a></div>
+  <figcaption>The venue at a glance: the TVL banner, then every live pool with its fee tier,
+  bin width, and how hard its liquidity is working.</figcaption>
+</figure><h2 id="the-total-up-top">The total, up top</h2>
+<p>The banner at the top is Friar&#39;s <strong>total value locked</strong>: every open Friar position, marked to
+the true market price, summed across all pools. It&#39;s the one number that says how much
+liquidity the venue is carrying.</p>
+<h2 id="the-pools-ranked-by-tvl">The pools, ranked by TVL</h2>
+<p>Below it, one row per pool, biggest first. Each row shows:</p>
+<ul>
+<li><strong>Pool</strong> — the pair, the pool&#39;s <strong>fee tier</strong> (its base fee), and its <strong>bin width</strong>. A pair
+can appear more than once, because each fee tier and width is a separate pool.</li>
+<li><strong>TVL</strong> — value locked in that pool, in dollars.</li>
+<li><strong>24h vol</strong> — how much traded through it in the last day.</li>
+<li><strong>Fee / TVL</strong> — a rough read on how hard the liquidity is working: the last day&#39;s fees as a
+share of the value locked. Higher means more fee income per dollar deposited.</li>
+<li><strong>LPs</strong> — how many open positions are in the pool.</li>
+</ul>
+<p>Only pools that actually hold liquidity appear here; empty pools are left off.</p>
+<h2 id="opening-into-a-pool">Opening into a pool</h2>
+<p>Every row has an <strong>Open</strong> button. It drops you into the open screen with that exact pool
+already selected — the pair, the quote side, the fee tier, and the bin width all filled in —
+so you land straight on &quot;join this pool&quot; and just set your range and amounts. It&#39;s the fastest
+way to add to a pool you can already see is working.</p>
+<p>If the pool you want doesn&#39;t exist yet, open from the <a href="/docs/guide-tokens">Tokens board</a> or the
+<a href="/docs/opening">open screen</a> instead and pick <em>Create a new pool</em>.</p>
+
+    <div class="pagers">
+      <a class="pager prev" href="/docs/guide-tokens"><span>previous</span>The Tokens board</a>
+      <a class="pager next" href="/docs/opening"><span>next</span>Opening a position</a>
+    </div>
+    <footer>
+      friar.fi · an independent project on Robinhood Chain, not affiliated with or endorsed
+      by Robinhood · nothing here is financial advice
+    </footer>
+  </main>
+</div>
+<script src="/beacon.js" defer></script>
+</body>
+</html>

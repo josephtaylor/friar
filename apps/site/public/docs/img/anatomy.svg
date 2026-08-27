@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="#100c07"/>
+
+  <!-- masthead -->
+  <text x="64" y="78" text-anchor="start" font-family="IBM Plex Mono" font-size="32" font-weight="600" fill="#cf9440" letter-spacing="9">FRIAR</text>
+  <text x="1536" y="76" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#8a7a5f" letter-spacing="3">ANATOMY OF A POSITION</text>
+  <line x1="64" y1="108" x2="1536" y2="108" stroke="#2a2012" stroke-width="1"/>
+  <text x="64" y="176" text-anchor="start" font-family="IBM Plex Sans" font-size="46" font-weight="600" fill="#ece3d2">Where your money actually sits</text>
+  <text x="64" y="218" text-anchor="start" font-family="IBM Plex Sans" font-size="21" font-weight="400" fill="#8a7a5f">The manager mints your bins inside Uniswap's PoolManager and keeps a record of them.</text>
+  <text x="64" y="248" text-anchor="start" font-family="IBM Plex Sans" font-size="21" font-weight="400" fill="#8a7a5f">It never holds a balance of its own.</text>
+
+  <!-- the hook, above the pool it prices -->
+  <rect x="1066" y="168" width="470" height="108" rx="10" fill="#181209" stroke="#463620" stroke-width="1.5"/>
+  <text x="1301" y="205" text-anchor="middle" font-family="IBM Plex Mono" font-size="23" font-weight="400" fill="#ece3d2">Friar hook</text>
+  <text x="1301" y="234" text-anchor="middle" font-family="IBM Plex Sans" font-size="19" font-weight="400" fill="#8a7a5f">sets dynamic swap fee</text>
+  <text x="1301" y="259" text-anchor="middle" font-family="IBM Plex Sans" font-size="18" font-weight="400" fill="#8fbf5f">not called on deposits or withdrawals</text>
+  <line x1="1301" y1="276" x2="1301" y2="324" stroke="#8a7a5f" stroke-width="2" stroke-dasharray="6 6"/>
+  <polygon points="1301,332 1295,321 1307,321" fill="#8a7a5f"/>
+  <text x="1413" y="312" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">fee only</text>
+
+  <!-- your wallet -->
+  <rect x="64" y="336" width="290" height="244" rx="10" fill="#211910" stroke="#463620" stroke-width="1.5"/>
+  <text x="209" y="392" text-anchor="middle" font-family="IBM Plex Mono" font-size="24" font-weight="400" fill="#ece3d2" letter-spacing="1">YOUR WALLET</text>
+  <text x="209" y="444" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8a7a5f">signs every action</text>
+  <text x="209" y="476" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8a7a5f">holds your tokens</text>
+  <text x="209" y="530" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8fbf5f">every payout lands here</text>
+
+  <!-- the manager -->
+  <rect x="510" y="336" width="400" height="244" rx="10" fill="#211910" stroke="#cf9440" stroke-width="1.5"/>
+  <text x="710" y="388" text-anchor="middle" font-family="IBM Plex Mono" font-size="23" font-weight="400" fill="#cf9440">FriarPositionManager</text>
+  <text x="710" y="432" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8a7a5f">stores your position</text>
+  <text x="710" y="462" text-anchor="middle" font-family="IBM Plex Mono" font-size="19" font-weight="400" fill="#ece3d2">owner · pool key · bins</text>
+  <line x1="550" y1="488" x2="870" y2="488" stroke="#2a2012"/>
+  <text x="710" y="520" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8a7a5f">routes your calls into v4</text>
+  <text x="710" y="552" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8fbf5f">never holds a balance</text>
+
+  <!-- uniswap, where the money is -->
+  <rect x="1066" y="336" width="470" height="244" rx="10" fill="#181209" stroke="#8fbf5f" stroke-width="2"/>
+  <text x="1301" y="388" text-anchor="middle" font-family="IBM Plex Mono" font-size="23" font-weight="400" fill="#8fbf5f">Uniswap v4 PoolManager</text>
+  <text x="1301" y="436" text-anchor="middle" font-family="IBM Plex Sans" font-size="23" font-weight="600" fill="#ece3d2">YOUR LIQUIDITY LIVES HERE</text>
+  <text x="1301" y="472" text-anchor="middle" font-family="IBM Plex Sans" font-size="20" font-weight="400" fill="#8a7a5f">Uniswap's own contract</text>
+  <text x="1301" y="512" text-anchor="middle" font-family="IBM Plex Sans" font-size="19" font-weight="400" fill="#8a7a5f">positions keyed by owner</text>
+  <text x="1301" y="542" text-anchor="middle" font-family="IBM Plex Sans" font-size="19" font-weight="400" fill="#8a7a5f">fees accrue in place</text>
+
+  <!-- flows -->
+  <line x1="362" y1="418" x2="493" y2="418" stroke="#cf9440" stroke-width="2"/>
+    <polygon points="502,418 491,412 491,424" fill="#cf9440"/>
+    <text x="432" y="404" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">calls</text>
+  <line x1="502" y1="504" x2="371" y2="504" stroke="#8fbf5f" stroke-width="2"/>
+    <polygon points="362,504 373,498 373,510" fill="#8fbf5f"/>
+    <text x="432" y="490" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8fbf5f">payouts</text>
+  <line x1="918" y1="418" x2="1049" y2="418" stroke="#cf9440" stroke-width="2"/>
+    <polygon points="1058,418 1047,412 1047,424" fill="#cf9440"/>
+    <text x="988" y="404" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">liquidity</text>
+  <line x1="1058" y1="504" x2="927" y2="504" stroke="#8fbf5f" stroke-width="2"/>
+    <polygon points="918,504 929,498 929,510" fill="#8fbf5f"/>
+    <text x="988" y="490" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8fbf5f">fees</text>
+
+  <!-- treasury -->
+  <rect x="510" y="656" width="400" height="104" rx="10" fill="#181209" stroke="#463620" stroke-width="1.5"/>
+  <text x="710" y="692" text-anchor="middle" font-family="IBM Plex Mono" font-size="22" font-weight="400" fill="#ece3d2">treasury</text>
+  <text x="710" y="723" text-anchor="middle" font-family="IBM Plex Sans" font-size="19" font-weight="400" fill="#8a7a5f">receives the performance fee</text>
+  <text x="710" y="747" text-anchor="middle" font-family="IBM Plex Sans" font-size="19" font-weight="400" fill="#8a7a5f">can only waive it</text>
+  <!-- the perf fee leaves the manager and goes DOWN to the treasury; arrowhead follows the money -->
+  <line x1="710" y1="592" x2="710" y2="646" stroke="#8a7a5f" stroke-width="2" stroke-dasharray="6 6"/>
+  <polygon points="710,654 704,643 716,643" fill="#8a7a5f"/>
+  <text x="842" y="628" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">perf fee</text>
+
+  <!-- footer -->
+  <line x1="64" y1="826" x2="1536" y2="826" stroke="#2a2012" stroke-width="1"/>
+  <text x="64" y="864" text-anchor="start" font-family="IBM Plex Mono" font-size="22" font-weight="400" fill="#cf9440" letter-spacing="2">friar.fi</text>
+  <text x="1536" y="864" text-anchor="end" font-family="IBM Plex Mono" font-size="19" font-weight="400" fill="#5d5138">Robinhood Chain · 4663</text>
+</svg>

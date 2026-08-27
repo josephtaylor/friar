@@ -1,0 +1,46 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "friar-indexer",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-07-01",
+  "observability": { "enabled": true },
+  // Custom domain instead of the workers.dev subdomain: the control routes are gated by
+  // OPS_TOKEN, but the personal workers.dev host does not belong in a public repo.
+  "routes": [{ "pattern": "indexer.friar.fi", "custom_domain": true }],
+  "workers_dev": false,
+  "durable_objects": {
+    "bindings": [{ "name": "CHAIN_INDEXER", "class_name": "ChainIndexer" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChainIndexer"] }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "friar",
+      "database_id": "68a5d0a8-b22e-4e11-964c-1426a9a4d187"
+    }
+  ],
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+  "vars": {
+    // Comma-separated FALLBACK LIST, tried in order — see src/rpc.ts for why and for the
+    // measured per-endpoint limits. publicnode is first because it serves every eth_call
+    // happily (the whole marking path) while the official endpoint rate-limits Cloudflare
+    // egress; wide eth_getLogs falls through to official, which is the only keyless one
+    // without a range cap. Put a keyed provider (Alchemy:
+    // https://robinhood-mainnet.g.alchemy.com/v2/KEY) FIRST once there is one — that makes
+    // both paths reliable and this whole arrangement redundant.
+    "RPC_URL": "https://robinhood-rpc.publicnode.com,https://rpc.mainnet.chain.robinhood.com",
+    "POOL_MANAGER": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+    // FriarPositionManager accepting new opens — redeployed 2026-07-27, block 20714167
+    // (mirrored in packages/chain ADDRESSES).
+    //
+    // NOT the indexing filter: the indexer watches EVERY deployment listed in
+    // packages/chain `MANAGERS` so retired managers' exits keep being indexed. Adding a
+    // manager there is what puts it in the log filter — this var is informational.
+    "POSITION_MANAGER": "0xBd76176c5524785452D80c4350f18e3A2040470E",
+    // Oldest watched manager's deploy block — must stay at or below the earliest entry in
+    // `MANAGERS`, or that deployment's history goes unindexed on a fresh reindex.
+    "START_BLOCK": "17526841"
+  }
+}

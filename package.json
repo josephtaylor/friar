@@ -1,0 +1,26 @@
+{
+  "name": "friar",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit && npm run typecheck --workspaces --if-present",
+    "dev:indexer": "npm run dev -w @friar/indexer",
+    "dev:api": "npm run dev -w @friar/api",
+    "dev:web": "npm run dev -w @friar/web",
+    "db:schema": "npm run db:schema -w @friar/indexer",
+    "db:seed": "node scripts/gen-seed.mjs && npm run db:seed -w @friar/indexer",
+    "stack": "node scripts/stack.mjs",
+    "deploy": "node scripts/deploy.mjs",
+    "docs": "node apps/site/scripts/build-docs.mjs"
+  },
+  "devDependencies": {
+    "marked": "^18.0.7",
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0"
+  }
+}

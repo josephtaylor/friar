@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>When price leaves your range · Friar docs</title>
+<meta name="description" content="Friar docs: a step-by-step guide to opening, reading, and closing a position, plus how the contracts work and where your funds sit." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<meta name="theme-color" content="#100c07" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="When price leaves your range · Friar docs" />
+<meta property="og:image" content="https://friar.fi/og.png?v=3" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="/docs/docs.css" />
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">FRIAR</a>
+  <nav class="top-links">
+    <a href="/docs/">docs</a>
+    <a href="https://discord.gg/wCjfVcq9C" target="_blank" rel="noreferrer">discord</a>
+    <a class="cta" href="https://app.friar.fi?ref=docs">launch app →</a>
+  </nav>
+</header>
+<div class="shell">
+  <aside class="side">
+    <div class="side-h">the docs</div>
+    <nav class="side-nav">
+        <a class="nav-item" href="/docs/">Overview</a>
+        <div class="side-sec">User guide</div>
+        <a class="nav-item" href="/docs/guide-start">Getting started</a>
+        <a class="nav-item" href="/docs/guide-tokens">The Tokens board</a>
+        <a class="nav-item" href="/docs/guide-pools">The Friar Pools page</a>
+        <a class="nav-item" href="/docs/opening">Opening a position</a>
+        <a class="nav-item" href="/docs/guide-position">Your position page</a>
+        <a class="nav-item" href="/docs/guide-fees">Collecting fees</a>
+        <a class="nav-item" href="/docs/guide-close">Closing a position</a>
+        <a class="nav-item" href="/docs/guide-history">Positions & history</a>
+        <div class="side-sec">How it works</div>
+        <a class="nav-item" href="/docs/shapes">Positions & shapes</a>
+        <a class="nav-item" href="/docs/fees">How the fee is set</a>
+        <a class="nav-item" href="/docs/costs">What Friar charges</a>
+        <a class="nav-item" href="/docs/anatomy">Where your money sits</a>
+        <a class="nav-item active" href="/docs/range">When it goes wrong</a>
+    </nav>
+  </aside>
+  <main class="doc">
+    <h1>When price leaves your range</h1>
+<p>A bin only earns while price is inside it. As price moves through your range, your position
+converts from one token into the other, bin by bin. Once price is past the last bin you&#39;re
+<strong>out of range</strong>: fully converted, earning nothing, waiting.</p>
+<h2 id="which-edge-matters">Which edge matters</h2>
+<ul>
+<li><strong>Out the top.</strong> Your asks all filled. You sold into strength and you&#39;re holding the quote
+token. This is the benign one — you took profit on the way up, and the position stops earning
+until price comes back.</li>
+<li><strong>Out the bottom.</strong> Your bids all filled. You bought the whole way down and you&#39;re holding the
+token. This is the dangerous one, and it&#39;s what impermanent loss feels like from the inside.</li>
+</ul>
+<p>A range that breaches upward sold on the way up. A range that breaches downward absorbed the
+whole fall as inventory.</p>
+<h2 id="a-breached-pool-39-s-price-lies">A breached pool&#39;s price lies</h2>
+<p>When price escapes the range entirely, the pool has no liquidity left to trade through, so its
+own quoted price <strong>freezes at the edge</strong> while the real market keeps moving. It can sit there,
+stale, for as long as nobody arbitrages it back.</p>
+<p>This matters because a lot of dashboards mark positions at the pool&#39;s own price. If the pool is
+frozen at −20% and the market is actually at −60%, those dashboards will tell you your position
+is worth far more than it is.</p>
+<blockquote>
+<p>Friar marks everything — the dashboard, snapshots, breach checks — against a <strong>reference
+market price</strong> from the deepest venue for the pair, not the pool tick. When the two disagree
+the pool price is shown separately and labelled as pinned.</p>
+</blockquote>
+<h2 id="reading-the-split">Reading the split</h2>
+<p>Every LP position decomposes into two numbers, and the total on its own hides which situation
+you&#39;re in:</p>
+<ul>
+<li><strong>fees earned</strong> — the toll income. More volume through your bins, more fees.</li>
+<li><strong>inventory change</strong> — what rebalancing did to you. If the token fell, you hold more of it,
+and this is negative.</li>
+</ul>
+<p>A worked example from a real position we ran. The token fell 42% in about twelve hours:</p>
+<pre><code>fees earned       +14.75%
+inventory change  −41.71%
+net               −26.97%
+</code></pre>
+<p>The position is down 27%, and the fee side returned 14.75% of capital in half a day. Both are
+true at once, and the net figure shows neither. A position down 27% that is still earning is a
+different situation from one down 27% that has stopped, and only the split separates them.</p>
+<h2 id="what-to-do-about-it">What to do about it</h2>
+<p>There&#39;s no automation yet. These are the manual options:</p>
+<ul>
+<li><strong>Collect</strong> while you&#39;re in range. Fees stop accruing the moment you breach, and collecting
+realises them in-kind so they&#39;re banked rather than marked.</li>
+<li><strong>Close</strong> if the thesis is gone. One call burns every bin, collects everything, and pays out.</li>
+<li><strong>Wait</strong>, if you think price comes back. Out of range costs you nothing except the fees you
+aren&#39;t earning while you sit there.</li>
+<li><strong>Reopen around the new price</strong> rather than waiting, if the token has genuinely repriced. A
+position centred where the market actually is earns; one centred where it used to be doesn&#39;t.</li>
+</ul>
+<p>Token selection dominates the outcome. A well-shaped position in a token that goes to zero
+still goes to zero, and no fee schedule changes that.</p>
+<h2 id="if-the-numbers-look-stale">If the numbers look stale</h2>
+<p>Charts, PnL and history all come from an indexer reading the chain. If it&#39;s behind, what you&#39;re
+looking at is old. That&#39;s a display problem, never a fund problem — withdrawal reads the chain
+directly and doesn&#39;t ask our servers anything. See
+<a href="/docs/anatomy">where your money sits</a>.</p>
+
+    <div class="pagers">
+      <a class="pager prev" href="/docs/anatomy"><span>previous</span>Where your money sits</a>
+      <span></span>
+    </div>
+    <footer>
+      friar.fi · an independent project on Robinhood Chain, not affiliated with or endorsed
+      by Robinhood · nothing here is financial advice
+    </footer>
+  </main>
+</div>
+<script src="/beacon.js" defer></script>
+</body>
+</html>

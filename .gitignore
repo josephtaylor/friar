@@ -1,6 +1,9 @@
-out/
-cache/
-broadcast/
-lib/
-.env
-script/local/
+node_modules/
+dist/
+.wrangler/
+.wrangler-persist/
+.dev.vars
+*.local
+.DS_Store
+.stack/
+scripts/seed-demo.sql

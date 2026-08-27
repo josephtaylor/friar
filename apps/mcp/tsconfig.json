@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "types": ["@cloudflare/workers-types/experimental"],
+    // Resolve the SDK workspace by source so a fresh checkout typechecks with no build.
+    "paths": { "@josephtaylor/friar-sdk": ["../../packages/sdk/src/index.ts"] }
+  },
+  "include": ["src/**/*.ts"]
+}

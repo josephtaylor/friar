@@ -2,14 +2,9 @@ MIT License
 
 Copyright (c) 2026 J. Taylor O'Connor
 
-Portions of this software are ported from other MIT-licensed projects and
-remain subject to their original copyright notices:
-
-  The dynamic fee mechanism in contracts/ is ported from Liquidity Book
-  (github.com/lfj-gg/joe-v2), Copyright (c) 2022 Trader Joe.
-
-  The tick math in packages/core is ported from Uniswap v4-core
-  (github.com/Uniswap/v4-core), Copyright (c) 2024 Uniswap Labs.
+The tick math in this package is ported from Uniswap v4-core
+(github.com/Uniswap/v4-core), Copyright (c) 2024 Uniswap Labs, also MIT
+licensed.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

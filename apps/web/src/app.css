@@ -1,0 +1,1727 @@
+/* ===========================================================================
+   Friar — "Friar's Robe"  (umber + parchment + rope-gold)
+   Design tokens are exact, from the design handoff. UI = IBM Plex Sans;
+   numbers / addresses / labels / badges = IBM Plex Mono.
+   =========================================================================== */
+
+:root {
+  /* surfaces */
+  --bg: #100c07; /* page */
+  --panel: #181209; /* tiles / cards */
+  --panel-inner: #211910; /* inner hairline / active toggle bg */
+  --border: #2a2012;
+  --border-hover: #463620;
+  --grid: #191307; /* chart gridlines */
+  --row-hover: #191207;
+
+  /* text */
+  --text: #ece3d2; /* parchment */
+  --dim: #8a7a5f;
+  --faint: #5d5138;
+  --mono-em: #b3a789; /* address / mono emphasis */
+
+  /* accent (rope-gold) */
+  --accent: #cf9440;
+  --accent-hover: #ddaa5c;
+  --on-accent: #171006;
+
+  /* semantic */
+  --green: #8fbf5f; /* gains / fees only */
+  --red: #e05d52; /* losses + live-price marker */
+
+  /* tints */
+  --green-bg: rgba(143, 191, 95, 0.1);
+  --red-bg: rgba(224, 93, 82, 0.1);
+  --gold-bg: rgba(207, 148, 64, 0.1);
+  --vpvr: rgba(236, 227, 210, 0.1);
+  --backdrop: rgba(10, 7, 4, 0.8);
+
+  /* bin bar fills */
+  --bin-bid: rgba(207, 148, 64, 0.85); /* quote / bids */
+  --bin-ask: rgba(143, 191, 95, 0.8); /* token / asks */
+  --bin-active: #ece3d2;
+
+  font-size: 14px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden; /* no horizontal scroll — long mono lines clip inside their tiles */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: pan-x pan-y; /* no pinch/double-tap zoom — iOS ignores the viewport meta for gestures */
+}
+
+a {
+  color: var(--dim);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--text);
+}
+
+/* ---- utilities ---------------------------------------------------------- */
+.mono {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+.dim {
+  color: var(--dim);
+}
+.faint {
+  color: var(--faint);
+}
+.gold {
+  color: var(--accent);
+}
+.pos,
+.green {
+  color: var(--green);
+}
+.neg,
+.red {
+  color: var(--red);
+}
+.warn {
+  color: var(--accent);
+}
+.sel {
+  user-select: all;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.trunc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.show-m {
+  display: none; /* mobile-only content — enabled in the media query */
+}
+
+/* ---- app frame + top bar ------------------------------------------------ */
+.app {
+  max-width: 1280px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  height: 60px;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  font-size: 15px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.nav {
+  display: flex;
+  gap: 24px;
+  font-size: 14px;
+}
+.nav-item {
+  color: var(--dim);
+  cursor: pointer;
+  background: none;
+  border: none;
+  font: inherit;
+  padding: 0;
+}
+.nav-item:hover {
+  color: var(--text);
+}
+.nav-item.active {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* Documentation + Discord. Secondary destinations, not core actions, so they read as
+   icons here at every width rather than as words on desktop and two more slots in an
+   already six-slot mobile bottom nav. The hit target stays 30px even though the glyph is
+   16px — an icon-only control still has to be tappable. */
+.icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  color: var(--dim);
+  text-decoration: none;
+  flex: none;
+}
+.icon-link:hover {
+  color: var(--text);
+  background: var(--panel);
+}
+.icon-link svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* ETH/USD display-denomination switch (segmented, mono) */
+.denom-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.denom-toggle button {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 7px 11px;
+}
+.denom-toggle button:hover {
+  color: var(--text);
+}
+.denom-toggle button.active {
+  color: var(--accent);
+  background: var(--gold-bg);
+}
+
+/* wallet chip */
+.wallet {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 13px;
+  background: none;
+  cursor: pointer;
+}
+.wallet:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+.wallet-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  vertical-align: -3px;
+  margin-right: 6px;
+}
+
+/* ---- buttons ------------------------------------------------------------ */
+button {
+  font: inherit;
+  cursor: pointer;
+}
+.btn {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 16px;
+}
+.btn:hover {
+  border-color: var(--border-hover);
+}
+.btn-lg {
+  border-radius: 8px;
+  padding: 12px 18px;
+  font-size: 14px;
+}
+.btn-block {
+  width: 100%;
+  display: block;
+}
+.btn-gold {
+  font-weight: 600;
+  color: var(--on-accent);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+}
+.btn-gold:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.btn-ghost-gold {
+  color: var(--accent);
+  border-color: var(--border);
+}
+.btn-ghost-gold:hover {
+  border-color: var(--accent);
+}
+.btn:disabled,
+.btn-gold:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---- main + page header ------------------------------------------------- */
+.main {
+  padding: 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.page-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.page-head h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.page-sub {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+/* ---- stat tiles --------------------------------------------------------- */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.tiles.tiles-gauge {
+  grid-template-columns: 1fr 1fr 1fr 300px;
+}
+.tile {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  min-width: 0; /* let 1fr grid tracks shrink below mono-number content */
+  overflow: hidden;
+}
+.tile-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.tile-value {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 21px;
+}
+.tile-unit {
+  font-size: 12px;
+  color: var(--dim);
+}
+.tile-sub {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 4px;
+}
+.tile-decomp {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+}
+.tile-spark {
+  width: 100%;
+  height: 34px;
+  margin-top: 8px;
+  display: block;
+}
+.tile-gauge {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.gauge-svg {
+  width: 100px;
+  height: 58px;
+  flex: none;
+}
+
+/* ---- position cards ----------------------------------------------------- */
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pos-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: 230px 1fr 230px;
+  gap: 22px;
+  align-items: center;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  width: 100%;
+}
+.pos-card:hover {
+  border-color: var(--border-hover);
+}
+.pos-card.closed {
+  opacity: 0.72;
+}
+.card-sym {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.card-sym b {
+  font-size: 16px;
+  font-weight: 600;
+}
+.card-q {
+  color: var(--dim);
+  font-size: 12px;
+}
+.card-id {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--accent);
+}
+.card-meta {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--dim);
+  margin-top: 6px;
+}
+.card-hist {
+  width: 100%;
+  height: 64px;
+  display: block;
+}
+.card-axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--dim);
+  margin-top: 6px;
+}
+.card-axis .axis-price {
+  color: var(--mono-em);
+}
+.card-right {
+  text-align: right;
+}
+.card-pnl {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 24px;
+}
+.card-pnl-sub {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 2px;
+}
+.card-fees {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  margin-top: 10px;
+}
+.card-val {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+/* ---- status chips ------------------------------------------------------- */
+.chip {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  border: 1px solid var(--dim);
+  color: var(--dim);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.chip-in {
+  border-color: var(--green);
+  color: var(--green);
+}
+.chip-below {
+  border-color: var(--red);
+  color: var(--red);
+}
+.chip-above {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.chip-closed {
+  border-color: var(--faint);
+  color: var(--faint);
+}
+
+/* ---- section divider ("History — …") ----------------------------------- */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  color: var(--dim);
+  font-size: 13px;
+  cursor: pointer;
+}
+.divider .rule {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.divider .mono {
+  font-size: 12px;
+}
+.divider:hover .rule {
+  background: var(--border-hover);
+}
+
+/* ---- breadcrumb + detail header ---------------------------------------- */
+.crumb {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--dim);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.crumb:hover {
+  color: var(--text);
+}
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.detail-sym {
+  font-size: 22px;
+  font-weight: 600;
+}
+.detail-sym.copyable {
+  cursor: pointer;
+}
+.detail-sym.copyable:hover {
+  color: var(--accent);
+}
+.copied-tick {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--green);
+  vertical-align: 2px;
+}
+.detail-q {
+  color: var(--dim);
+  font-size: 15px;
+}
+.detail-id {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--accent);
+}
+.detail-age {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--dim);
+}
+.detail-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* meta line */
+.meta-line {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--dim);
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.meta-line .addr {
+  color: var(--mono-em);
+  user-select: all;
+}
+.meta-line a {
+  color: var(--dim);
+}
+.meta-line a:hover {
+  color: var(--accent);
+}
+
+/* ---- LIVE strip --------------------------------------------------------- */
+.live {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+}
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  flex: none;
+  animation: pulse 1.8s ease-in-out infinite;
+}
+.live-dot.stale {
+  background: var(--faint);
+  animation: none;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+.live .spacer {
+  margin-left: auto;
+}
+.live .pinned {
+  color: var(--accent);
+}
+
+/* ---- generic card wrapper ---------------------------------------------- */
+.card-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.card-box-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.card-box-title {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* ---- BinChart ----------------------------------------------------------- */
+.binchart svg {
+  width: 100%;
+  height: 140px;
+  display: block;
+}
+.bin-legend {
+  display: flex;
+  gap: 16px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--dim);
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.legend-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  vertical-align: -1px;
+  margin-right: 5px;
+}
+.bin-axistext {
+  fill: var(--dim);
+  font-size: 10px;
+  font-family: "IBM Plex Mono", monospace;
+}
+.bin-markline {
+  stroke: var(--red);
+  stroke-width: 1.2;
+}
+.bin-marktext {
+  fill: var(--red);
+  font-size: 10px;
+  font-family: "IBM Plex Mono", monospace;
+}
+.grid-line {
+  stroke: var(--grid);
+  stroke-width: 1;
+}
+
+/* bin composition fills (histograms) */
+.bin-quote {
+  fill: var(--bin-bid);
+}
+.bin-token {
+  fill: var(--bin-ask);
+}
+.bin-mixed {
+  fill: var(--bin-active);
+}
+.sw-quote {
+  background: var(--bin-bid);
+}
+.sw-token {
+  background: var(--bin-ask);
+}
+.sw-active {
+  background: var(--bin-active);
+}
+.binchart-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--dim);
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.chart-legend .sq {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  vertical-align: -1px;
+  margin: 0 3px 0 8px;
+}
+
+/* ---- price chart card --------------------------------------------------- */
+.pricechart svg {
+  width: 100%;
+  display: block;
+}
+.tf-chips {
+  display: flex;
+  gap: 4px;
+}
+.tf-chip {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--dim);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.tf-chip:hover {
+  color: var(--text);
+}
+.tf-chip.active {
+  background: var(--panel-inner);
+  color: var(--text);
+}
+.attribution {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--faint);
+  margin-top: 6px;
+}
+
+/* ---- grid tables (activity / pools / history / bins) -------------------- */
+.gtable {
+  display: flex;
+  flex-direction: column;
+}
+.gtable-head,
+.gtable-row {
+  display: grid;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+}
+.gtable-head {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  border-bottom: 1px solid var(--border);
+}
+.gtable-row {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  border-bottom: 1px solid var(--grid);
+}
+.gtable-row.clickable {
+  cursor: pointer;
+}
+.gtable-row.clickable:hover {
+  background: var(--row-hover);
+}
+.gtable-head.gtable-lg {
+  padding: 10px 18px;
+}
+.gtable-row.gtable-lg {
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--panel-inner);
+}
+/* column tracks per table — condensed variants live in the mobile media query */
+.gt-tokens {
+  grid-template-columns: 40px minmax(150px, 1fr) 100px 74px 104px 96px 90px 110px 96px;
+}
+.gt-hist {
+  grid-template-columns: 64px minmax(150px, 190px) 120px 90px 1fr 150px 130px 40px;
+}
+.cell-r {
+  text-align: right;
+}
+/* token board: registry logos (stock tokens) + the paginated show-more row */
+.tok-logo {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  vertical-align: -3px;
+  margin-right: 7px;
+}
+.show-more {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  border-top: 1px solid var(--border);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--dim);
+  padding: 12px;
+}
+.show-more:hover {
+  color: var(--text);
+}
+.th-sort {
+  cursor: pointer;
+  user-select: none;
+}
+.th-sort:hover,
+.th-sort.th-active {
+  color: var(--text);
+}
+.gtable a {
+  color: var(--dim);
+}
+.gtable a:hover {
+  color: var(--accent);
+}
+
+/* side badges (activity) */
+.side {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  padding: 2px 7px;
+  text-align: center;
+}
+.side-buy {
+  color: var(--green);
+  background: var(--green-bg);
+}
+.side-sell {
+  color: var(--red);
+  background: var(--red-bg);
+}
+.side-life {
+  color: var(--accent);
+  background: var(--gold-bg);
+}
+
+/* ---- forms (open position) --------------------------------------------- */
+.create {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+  align-items: start;
+}
+.form-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.input {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 11px;
+  width: 100%;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.input-search {
+  width: 220px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.field-row {
+  display: flex;
+  gap: 10px;
+}
+.field-row > .field {
+  flex: 1;
+}
+
+/* segmented control */
+.segmented {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.segmented button {
+  flex: 1;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 13px;
+  color: var(--dim);
+  background: none;
+  border: none;
+  padding: 8px 6px;
+}
+.segmented button:hover {
+  color: var(--text);
+}
+.segmented button.active {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+/* joined toggle (deposit mode) */
+.toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.toggle button {
+  flex: 1;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 13px;
+  color: var(--dim);
+  background: none;
+  border: none;
+  padding: 8px 6px;
+}
+.toggle button.active {
+  background: var(--panel-inner);
+  color: var(--text);
+}
+
+/* preset pills */
+.pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pill {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--dim);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 4px 12px;
+}
+.pill:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+.pill.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* skew slider */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  outline: none;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text);
+  border: 2px solid var(--accent);
+  cursor: pointer;
+}
+.slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text);
+  border: 2px solid var(--accent);
+  cursor: pointer;
+}
+
+/* preview card rows */
+.preview-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+}
+.preview-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.preview-row .k {
+  color: var(--dim);
+}
+.disclose {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--faint);
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 2px;
+}
+
+/* preflight line */
+.preflight {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+}
+.preflight.ok {
+  color: var(--green);
+}
+.preflight.bad {
+  color: var(--red);
+}
+/* unverified, not failed — a balance we couldn't read must not read as a passing check */
+.preflight.warn {
+  color: var(--accent);
+}
+.submit-note {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--faint);
+  text-align: center;
+}
+
+/* ---- range box overlay (creation chart) -------------------------------- */
+.rangebox {
+  position: absolute;
+  border: 1px dashed var(--accent);
+  background: rgba(207, 148, 64, 0.07);
+  left: 0;
+  right: 0;
+}
+.grab {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--accent);
+  cursor: ns-resize;
+}
+.grab.top {
+  top: -3px;
+}
+.grab.bot {
+  bottom: -3px;
+}
+
+/* ---- modal / TxStepper -------------------------------------------------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 1rem;
+}
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 22px;
+  max-width: 480px;
+  width: 100%;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+.modal-sub {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--dim);
+  margin-bottom: 16px;
+}
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.step {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.step.todo {
+  opacity: 0.5;
+}
+.step-glyph {
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--dim);
+  flex: none;
+}
+.step-done .step-glyph {
+  color: var(--green);
+}
+.step-wallet .step-glyph,
+.step-mining .step-glyph {
+  color: var(--accent);
+}
+.step-failed .step-glyph {
+  color: var(--red);
+}
+.step-label {
+  font-weight: 500;
+}
+.step-explain {
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 2px;
+}
+.step-fail-box {
+  border: 1px solid var(--red);
+  background: var(--red-bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: var(--red);
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* ---- share PnL card ----------------------------------------------------- */
+.modal-share {
+  max-width: 680px;
+}
+.share-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1200 / 630;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #100c07;
+}
+.share-preview.loading {
+  opacity: 0.5;
+}
+.share-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0 16px;
+}
+.share-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.modal-share .modal-actions {
+  flex-wrap: wrap;
+}
+.modal-share .modal-actions a.btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ---- request-access form (/access) -------------------------------------- */
+.access-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(420px, 100%);
+  text-align: left;
+}
+.link-note {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+/* ---- gate --------------------------------------------------------------- */
+.gate {
+  min-height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 2rem;
+  text-align: center;
+}
+.gate-brand {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  color: var(--accent);
+}
+.gate-tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  color: var(--dim);
+}
+.gate-msg {
+  font-size: 14px;
+  color: var(--text);
+  margin-top: 8px;
+}
+.gate-wallets {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  min-width: 240px;
+}
+.gate-wallet {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 11px 16px;
+}
+.gate-wallet:hover {
+  border-color: var(--accent);
+}
+.gate-wallet.blocked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.gate-wallet.blocked:hover {
+  border-color: var(--border);
+}
+.gate-wallet-tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.gate-note {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 6px;
+}
+.gate-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  max-width: 460px;
+}
+.gate-addr {
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--dim);
+  user-select: all;
+  word-break: break-all;
+  margin-top: 8px;
+}
+
+/* ---- misc states -------------------------------------------------------- */
+.empty {
+  color: var(--dim);
+  padding: 3rem 0;
+  text-align: center;
+}
+.empty.error {
+  color: var(--red);
+}
+
+/* A token resolved by pasted address rather than found on the board. Marked because the
+   board is a ranked, floored list and this row is neither — it bypassed both. */
+.offboard-note {
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+/* Market context for the token being opened. Wraps rather than scrolls: this sits in the
+   creation form, where a hidden stat is worse than a taller box. */
+.token-market {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tm-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+}
+.tm-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.tm-k {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: var(--faint);
+}
+.tm-v {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  color: var(--text);
+}
+.tm-v.green {
+  color: var(--green);
+}
+.tm-v.warn {
+  color: var(--red);
+}
+.tm-v.dim {
+  color: var(--dim);
+}
+.tm-note {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--dim);
+}
+.tm-note.green {
+  color: var(--green);
+}
+
+/* An action that reads as prose, for the middle of a sentence. */
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+}
+.btn-link:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+.loading {
+  color: var(--dim);
+  padding: 2rem 0;
+  text-align: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+}
+
+/* ---- mobile ------------------------------------------------------------- */
+.mobile-only {
+  display: none;
+}
+
+@media (max-width: 780px) {
+  .app {
+    border: none;
+  }
+  .nav {
+    display: none;
+  }
+  .topbar {
+    gap: 14px;
+    padding: 0 16px;
+  }
+  /* mobile top bar = wordmark + wallet only; the FAB in the bottom nav opens */
+  .topbar .btn-gold {
+    display: none;
+  }
+  .page-sub {
+    display: none;
+  }
+  .main {
+    padding: 16px;
+    gap: 14px;
+    padding-bottom: calc(132px + env(safe-area-inset-bottom)); /* clear bottom nav + pinned detail actions */
+  }
+  .tiles,
+  .tiles.tiles-gauge {
+    grid-template-columns: 1fr 1fr;
+  }
+  .tile-value {
+    font-size: 18px;
+  }
+  .input {
+    font-size: 16px; /* <16px would trigger iOS focus-zoom if zoom ever re-enables */
+  }
+  .page-head .input-search {
+    flex: 1 1 130px;
+    width: auto;
+    min-width: 0;
+  }
+
+  /* tables: condensed column sets — cells marked .hide-m drop out, grids narrow to match */
+  .hide-m {
+    display: none !important;
+  }
+  .show-m {
+    display: block;
+  }
+  .gtable-head,
+  .gtable-row {
+    gap: 8px;
+  }
+  .gtable-head.gtable-lg,
+  .gtable-row.gtable-lg {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  /* token board: two-line rows — symbol/chg/vol on top, mcap·liq·fee-tvl beneath.
+     Cells place by grid-area so the desktop DOM order needn't change; the header
+     collapses to a plain wrap of sort chips (it can't align with a 2-line row). */
+  .gtable-head.gt-tokens {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+  }
+  .gtable-row.gt-tokens {
+    grid-template-areas:
+      "tok chg vol"
+      "mcap liq ftv";
+    grid-template-columns: minmax(0, 1fr) 74px 88px;
+    row-gap: 3px;
+  }
+  .gt-tokens .c-tok {
+    grid-area: tok;
+  }
+  .gt-tokens .c-chg {
+    grid-area: chg;
+  }
+  .gt-tokens .c-vol {
+    grid-area: vol;
+  }
+  .gt-tokens .c-mcap,
+  .gt-tokens .c-liq,
+  .gt-tokens .c-ftv {
+    font-size: 10px;
+    color: var(--dim);
+  }
+  .gt-tokens .c-mcap {
+    grid-area: mcap;
+    text-align: left;
+  }
+  .gt-tokens .c-liq {
+    grid-area: liq;
+  }
+  .gt-tokens .c-ftv {
+    grid-area: ftv;
+  }
+  .gt-tokens .c-vol::before {
+    content: "VOL ";
+    color: var(--faint);
+    font-size: 10px;
+  }
+  .gt-tokens .c-mcap::before {
+    content: "MC ";
+    color: var(--faint);
+  }
+  .gt-tokens .c-liq::before {
+    content: "LIQ ";
+    color: var(--faint);
+  }
+  .gt-tokens .c-ftv::before {
+    content: "F/TVL ";
+    color: var(--faint);
+  }
+  .gt-hist {
+    grid-template-columns: minmax(0, 1fr) 92px 92px;
+  }
+  .pos-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .card-right {
+    text-align: left;
+  }
+  .create {
+    grid-template-columns: 1fr;
+  }
+  .form-panel {
+    order: 2;
+  }
+  /* detail actions → pinned bottom bar (above the bottom nav) */
+  .detail-actions {
+    position: fixed;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    left: 0;
+    right: 0;
+    margin-left: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    z-index: 39;
+  }
+  .detail-actions .btn {
+    flex: 1 1 40%;
+  }
+  .detail-actions .btn-gold {
+    flex: 1 1 100%;
+    order: -1; /* Close & zap full-width on top */
+  }
+  .mobile-only {
+    display: flex;
+  }
+
+  /* bottom nav */
+  .botnav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: calc(64px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    z-index: 40;
+  }
+  .botnav-item {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--dim);
+    background: none;
+    border: none;
+    padding: 12px 8px;
+  }
+  .botnav-item.active {
+    color: var(--text);
+  }
+  .botnav-fab {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+    border: none;
+    font-size: 26px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: -14px;
+  }
+}
+
+/* ── Pools page ─────────────────────────────────────────────────────────── */
+.muted { color: var(--dim); font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+.page-doclink { color: var(--accent); font-family: "IBM Plex Mono", monospace; font-size: 12px; text-decoration: none; }
+.page-doclink:hover { text-decoration: underline; }
+
+/* the TVL flex banner */
+.pools-tvl {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  padding: 20px 22px; margin: 16px 0 18px; /* top margin: gap under the page header */
+}
+.pools-tvl-label {
+  font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.13em;
+  text-transform: uppercase; color: var(--dim);
+}
+.pools-tvl-value { font-size: 38px; font-weight: 700; letter-spacing: -0.02em; color: var(--gold-text, var(--accent)); margin: 4px 0 2px; }
+.pools-tvl-sub { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--faint); }
+
+.pools-table { display: flex; flex-direction: column; }
+.pools-row {
+  display: grid; grid-template-columns: 1fr auto auto auto auto auto; gap: 18px; align-items: center;
+  padding: 13px 14px; border-bottom: 1px solid var(--border);
+}
+.pools-open {
+  font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var(--bg);
+  background: var(--accent); border: none; border-radius: 6px; padding: 7px 16px;
+  cursor: pointer; font-weight: 600; letter-spacing: 0.02em;
+}
+.pools-open:hover { filter: brightness(1.08); }
+.pools-head .pools-open { visibility: hidden; } /* keeps the header grid aligned */
+.pools-row .num { text-align: right; font-family: "IBM Plex Mono", monospace; font-size: 13.5px; min-width: 72px; }
+.pools-head {
+  font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--faint); border-bottom: 1px solid var(--edge2, var(--border));
+}
+.pools-head .num { min-width: 72px; }
+.pools-row:not(.pools-head):hover { background: var(--panel); }
+.pools-pair { display: flex; flex-direction: column; gap: 3px; }
+.pools-pair b { font-size: 15px; font-weight: 600; }
+.pools-tags { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--dim); }
+
+/* Friar Pools — mobile. Placed at the END of the file so these override the desktop
+   .pools-row rules (equal specificity → source order wins), which are also near the end. */
+@media (max-width: 780px) {
+  .pools-tvl-value { font-size: 30px; }
+  .pools-row.pools-head { display: none; }
+  .pools-row {
+    /* condensed: 2 rows — pair on top, the four stats across the bottom; the Open button is
+       its own right-hand column spanning both rows. minmax(0,…) so the stat columns shrink to
+       the phone width instead of their content-min (plain 1fr overflows). */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-areas:
+      "pair pair pair pair open"
+      "tvl  vol  ftv  lps  open";
+    gap: 10px 8px;
+    align-items: center;
+    padding: 13px 14px;
+  }
+  .pv-pair { grid-area: pair; min-width: 0; align-self: start; }
+  .pools-open { grid-area: open; align-self: center; margin-left: 6px; padding: 9px 18px; }
+  .pools-row .pv-tvl { grid-area: tvl; }
+  .pools-row .pv-vol { grid-area: vol; }
+  .pools-row .pv-ftv { grid-area: ftv; }
+  .pools-row .pv-lps { grid-area: lps; }
+  .pools-row .num { text-align: left; min-width: 0; font-size: 13px; }
+  .pools-row .num::before {
+    content: attr(data-l); display: block; font-size: 9.5px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--faint); margin-bottom: 2px;
+  }
+}
+
+.tile-spark { position: relative; margin-top: 8px; }
+.tile-spark svg { display: block; width: 100%; height: 34px; cursor: crosshair; }
+.tile-spark-tip {
+  position: absolute; top: -22px; right: 0;
+  font-family: "IBM Plex Mono", monospace; font-size: 11px;
+  color: var(--faint); white-space: nowrap; pointer-events: none;
+}
+
+/* trading-journal calendar */
+.cal { padding: 0; overflow: hidden; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.cal-title { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--dim); letter-spacing: 0.08em; text-transform: uppercase; }
+.cal-nav { padding: 2px 10px; font-size: 13px; line-height: 1.4; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.cal-dows span { text-align: center; font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--faint); padding: 6px 0; border-bottom: 1px solid var(--border); }
+.cal-cell { min-height: 62px; padding: 6px 7px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.cal-cell:nth-child(7n) { border-right: none; }
+.cal-cell.empty { background: rgba(0, 0, 0, 0.15); }
+.cal-cell.has { cursor: pointer; }
+.cal-cell.has:hover { outline: 1px solid var(--border-hover); outline-offset: -1px; }
+.cal-cell.today { outline: 1px solid var(--accent); outline-offset: -1px; }
+.cal-cell.sel { outline: 1px solid var(--green); outline-offset: -1px; }
+.cal-day { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--dim); }
+.cal-cell.has .cal-day { color: var(--text); }
+.cal-pnl { font-family: "IBM Plex Mono", monospace; font-size: 11px; }
+.cal-amt { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--dim); }
+@media (max-width: 720px) { .cal-cell { min-height: 54px; padding: 4px 5px; } .cal-pnl { font-size: 9px; } .cal-amt { font-size: 8px; } }

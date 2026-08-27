@@ -1,0 +1,24 @@
+{
+  "name": "@friar/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8791 --inspector-port 9233 --persist-to ../../.wrangler-persist",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@friar/chain": "*",
+    "@friar/core": "*",
+    "@josephtaylor/friar-sdk": "*",
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "agents": "^0.2.0",
+    "viem": "^2.21.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250705.0",
+    "wrangler": "^4.24.0"
+  }
+}

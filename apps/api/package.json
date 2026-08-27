@@ -1,0 +1,22 @@
+{
+  "name": "@friar/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8788 --inspector-port 9232 --persist-to ../../.wrangler-persist",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@friar/chain": "*",
+    "@friar/core": "*",
+    "@resvg/resvg-wasm": "^2.6.2",
+    "hono": "^4.6.0",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250705.0",
+    "wrangler": "^4.24.0"
+  }
+}

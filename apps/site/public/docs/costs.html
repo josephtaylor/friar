@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>What Friar charges · Friar docs</title>
+<meta name="description" content="Friar docs: a step-by-step guide to opening, reading, and closing a position, plus how the contracts work and where your funds sit." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<meta name="theme-color" content="#100c07" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="What Friar charges · Friar docs" />
+<meta property="og:image" content="https://friar.fi/og.png?v=3" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="/docs/docs.css" />
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">FRIAR</a>
+  <nav class="top-links">
+    <a href="/docs/">docs</a>
+    <a href="https://discord.gg/wCjfVcq9C" target="_blank" rel="noreferrer">discord</a>
+    <a class="cta" href="https://app.friar.fi?ref=docs">launch app →</a>
+  </nav>
+</header>
+<div class="shell">
+  <aside class="side">
+    <div class="side-h">the docs</div>
+    <nav class="side-nav">
+        <a class="nav-item" href="/docs/">Overview</a>
+        <div class="side-sec">User guide</div>
+        <a class="nav-item" href="/docs/guide-start">Getting started</a>
+        <a class="nav-item" href="/docs/guide-tokens">The Tokens board</a>
+        <a class="nav-item" href="/docs/guide-pools">The Friar Pools page</a>
+        <a class="nav-item" href="/docs/opening">Opening a position</a>
+        <a class="nav-item" href="/docs/guide-position">Your position page</a>
+        <a class="nav-item" href="/docs/guide-fees">Collecting fees</a>
+        <a class="nav-item" href="/docs/guide-close">Closing a position</a>
+        <a class="nav-item" href="/docs/guide-history">Positions & history</a>
+        <div class="side-sec">How it works</div>
+        <a class="nav-item" href="/docs/shapes">Positions & shapes</a>
+        <a class="nav-item" href="/docs/fees">How the fee is set</a>
+        <a class="nav-item active" href="/docs/costs">What Friar charges</a>
+        <a class="nav-item" href="/docs/anatomy">Where your money sits</a>
+        <a class="nav-item" href="/docs/range">When it goes wrong</a>
+    </nav>
+  </aside>
+  <main class="doc">
+    <h1>What Friar charges</h1>
+<p>A share of the fees your position earns. Nothing else, ever.</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Any position</strong> — shaped (Spot, Curve, Bid-Ask) or a simple single bin</td>
+<td><strong>5%</strong> of fees earned</td>
+</tr>
+<tr>
+<td>The hook, at the pool level</td>
+<td><strong>0%</strong></td>
+</tr>
+<tr>
+<td>Deposits, withdrawals, principal</td>
+<td><strong>never charged</strong></td>
+</tr>
+</tbody></table></div>
+<p>The rate is an immutable constructor value on the manager, under a hard 20% sanity ceiling in
+the code. There is no function that raises it. A different rate would be a different contract
+that you&#39;d have to choose to use.</p>
+<h2 id="how-it-39-s-taken">How it&#39;s taken</h2>
+<p>Uniswap v4 reports fees earned separately from principal whenever liquidity is touched. The
+manager takes its share of <strong>exactly that number</strong>, in-kind, in the same transaction, and sends
+it to the treasury. Your principal is never part of the calculation.</p>
+<p>So if a position earns 0.05 WETH in fees and you collect:</p>
+<pre><code>fees earned      0.0500 WETH
+performance fee  0.0025 WETH   (5%)
+you receive      0.0475 WETH
+principal        untouched
+</code></pre>
+<p>You only pay when you&#39;ve earned. There&#39;s no management fee, no deposit fee, no withdrawal fee,
+and nothing accrues while a position sits idle.</p>
+<h2 id="why-one-rate">Why one rate</h2>
+<p>Earlier managers split the rate by position type: 10% on shaped positions, 1% on a simple
+single bin. Measured over the live positions that split showed no yield difference between
+the types; it mostly taught people to optimise their bin count around the fee instead of
+around the market. One flat rate for everything replaced it in August 2026.</p>
+<p>Your rate is fixed by the manager your position opened on, for the position&#39;s whole life. A
+position opened under an earlier manager keeps that manager&#39;s rates until it&#39;s closed.</p>
+<h2 id="fee-exemption">Fee exemption</h2>
+<p>The treasury can <strong>waive</strong> the fee for an address, and that&#39;s the only thing it can do to a
+rate. It cannot raise one, for anybody. Exemptions live in a shared on-chain registry
+(<code>FeeExemptionRegistry</code>) that survives manager upgrades, and its <code>setExempt</code> is
+discount-only by construction, which is why a compromised treasury key can lose Friar revenue
+and nothing else. Details in <a href="/docs/anatomy">where your money sits</a>.</p>
+<h2 id="what-you-also-pay-that-isn-39-t-us">What you also pay, that isn&#39;t us</h2>
+<ul>
+<li><strong>Gas.</strong> Robinhood Chain blocks are ~100ms and gas is cents, but a 100-bin open is a large
+transaction. Fewer bins is cheaper.</li>
+<li><strong>Swap fees on zaps.</strong> If you open from a single token, the swap leg pays whatever the venue
+it routes through charges. That goes to that pool&#39;s LPs.</li>
+<li><strong>The market.</strong> Providing liquidity means holding inventory. No fee schedule fixes a token
+going down, and that&#39;s usually the number that dominates. See
+<a href="/docs/range">when price leaves your range</a>.</li>
+</ul>
+
+    <div class="pagers">
+      <a class="pager prev" href="/docs/fees"><span>previous</span>How the fee is set</a>
+      <a class="pager next" href="/docs/anatomy"><span>next</span>Where your money sits</a>
+    </div>
+    <footer>
+      friar.fi · an independent project on Robinhood Chain, not affiliated with or endorsed
+      by Robinhood · nothing here is financial advice
+    </footer>
+  </main>
+</div>
+<script src="/beacon.js" defer></script>
+</body>
+</html>

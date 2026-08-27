@@ -1,0 +1,13 @@
+{
+  // Marketing landing page (static) served at the apex + www as a Workers
+  // static-assets deployment.
+  "name": "friar-landing",
+  "compatibility_date": "2026-07-01",
+  // Only ./public is served. The directory used to be "." which published
+  // scripts/ and this file itself at friar.fi/scripts/… and friar.fi/wrangler.jsonc.
+  "assets": { "directory": "./public" },
+  "routes": [
+    { "pattern": "friar.fi", "custom_domain": true },
+    { "pattern": "www.friar.fi", "custom_domain": true }
+  ]
+}

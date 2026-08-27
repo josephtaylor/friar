@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "friar-mcp",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "alias": { "ai": "./src/stub-ai.ts" },
+  "observability": { "enabled": true },
+  "routes": [{ "pattern": "mcp.friar.fi", "custom_domain": true }],
+  "durable_objects": {
+    "bindings": [{ "name": "FriarMCP", "class_name": "FriarMCP" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FriarMCP"] }],
+  "vars": {
+    "API_URL": "https://api.friar.fi",
+    "RPC_URL": "https://rpc.mainnet.chain.robinhood.com"
+  }
+}

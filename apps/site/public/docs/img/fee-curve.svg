@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#cf9440" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#cf9440" stop-opacity="0.02"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="#100c07"/>
+
+  <text x="64" y="78" text-anchor="start" font-family="IBM Plex Mono" font-size="32" font-weight="600" fill="#cf9440" letter-spacing="9">FRIAR</text>
+  <text x="1536" y="76" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#8a7a5f" letter-spacing="3">THE DYNAMIC FEE</text>
+  <line x1="64" y1="108" x2="1536" y2="108" stroke="#2a2012"/>
+  <text x="64" y="172" text-anchor="start" font-family="IBM Plex Sans" font-size="46" font-weight="600" fill="#ece3d2">The fee reprices on every swap</text>
+  <text x="64" y="214" text-anchor="start" font-family="IBM Plex Sans" font-size="21" font-weight="400" fill="#8a7a5f">Low while the market is calm, climbing with how far price has just moved, decaying back when it</text>
+  <text x="64" y="242" text-anchor="start" font-family="IBM Plex Sans" font-size="21" font-weight="400" fill="#8a7a5f">stops. The dashed line marks 1%, a common static fee tier, for scale.</text>
+
+  <line x1="142" y1="300.0" x2="1536" y2="300.0" stroke="#2a2012"/>
+       <text x="126" y="306" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#e05d52">10%  cap</text><line x1="142" y1="510.0" x2="1536" y2="510.0" stroke="#2a2012"/>
+       <text x="126" y="516" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#8a7a5f">5%</text><line x1="142" y1="594.0" x2="1536" y2="594.0" stroke="#2a2012"/>
+       <text x="126" y="600" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#8a7a5f">3%</text><line x1="142" y1="678.0" x2="1536" y2="678.0" stroke="#2a2012"/>
+       <text x="126" y="684" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#8a7a5f">1%</text><line x1="142" y1="720.0" x2="1536" y2="720.0" stroke="#2a2012"/>
+       <text x="126" y="726" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#8a7a5f">0%</text>
+
+  <!-- the 1% gridline, drawn dashed, as a familiar reference height -->
+  <line x1="142" y1="678.0" x2="1536" y2="678.0" stroke="#8a7a5f" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="1536" y="664" text-anchor="end" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">1% static tier</text>
+
+  <path d="M142.0,686.4 L188.5,686.4 L188.5,686.4 L234.9,686.4 L234.9,686.4 L281.4,686.4 L281.4,686.4 L327.9,686.4 L327.9,686.4 L374.3,686.4 L374.3,686.4 L420.8,686.4 L420.8,686.4 L423.9,686.4 L423.9,682.1 L427.0,682.1 L427.0,669.2 L430.1,669.2 L430.1,647.7 L433.2,647.7 L433.2,647.7 L436.3,647.7 L436.3,617.6 L439.4,617.6 L439.4,578.9 L442.5,578.9 L442.5,531.6 L445.6,531.6 L445.6,475.7 L448.7,475.7 L448.7,411.1 L451.8,411.1 L451.8,411.1 L454.9,411.1 L454.9,338.0 L458.0,338.0 L458.0,300.0 L461.1,300.0 L461.1,300.0 L464.2,300.0 L464.2,300.0 L467.3,300.0 L467.3,300.0 L470.4,300.0 L470.4,300.0 L473.5,300.0 L473.5,300.0 L476.6,300.0 L476.6,300.0 L479.7,300.0 L479.7,300.0 L482.8,300.0 L482.8,300.0 L485.9,300.0 L485.9,300.0 L489.0,300.0 L489.0,300.0 L492.0,300.0 L492.0,300.0 L495.1,300.0 L495.1,300.0 L498.2,300.0 L498.2,300.0 L501.3,300.0 L501.3,300.0 L504.4,300.0 L504.4,300.0 L507.5,300.0 L507.5,300.0 L510.6,300.0 L510.6,300.0 L513.7,300.0 L513.7,300.0 L560.2,300.0 L560.2,300.0 L606.7,300.0 L606.7,518.4 L653.1,518.4 L653.1,644.4 L699.6,644.4 L699.6,675.9 L746.1,675.9 L746.1,683.8 L792.5,683.8 L792.5,685.7 L839.0,685.7 L839.0,686.2 L885.5,686.2 L885.5,686.4 L931.9,686.4 L931.9,686.4 L978.4,686.4 L978.4,686.4 L1024.9,686.4 L1024.9,686.4 L1071.3,686.4 L1071.3,686.4 L1117.8,686.4 L1117.8,686.4 L1164.3,686.4 L1164.3,686.4 L1210.7,686.4 L1210.7,686.4 L1257.2,686.4 L1257.2,686.4 L1303.7,686.4 L1303.7,686.4 L1350.1,686.4 L1350.1,686.4 L1396.6,686.4 L1396.6,686.4 L1443.1,686.4 L1443.1,686.4 L1489.5,686.4 L1489.5,686.4 L1536.0,686.4 L1536.0,686.4 L1536.0,720 L142.0,720 Z" fill="url(#fill)"/>
+  <path d="M142.0,686.4 L188.5,686.4 L188.5,686.4 L234.9,686.4 L234.9,686.4 L281.4,686.4 L281.4,686.4 L327.9,686.4 L327.9,686.4 L374.3,686.4 L374.3,686.4 L420.8,686.4 L420.8,686.4 L423.9,686.4 L423.9,682.1 L427.0,682.1 L427.0,669.2 L430.1,669.2 L430.1,647.7 L433.2,647.7 L433.2,647.7 L436.3,647.7 L436.3,617.6 L439.4,617.6 L439.4,578.9 L442.5,578.9 L442.5,531.6 L445.6,531.6 L445.6,475.7 L448.7,475.7 L448.7,411.1 L451.8,411.1 L451.8,411.1 L454.9,411.1 L454.9,338.0 L458.0,338.0 L458.0,300.0 L461.1,300.0 L461.1,300.0 L464.2,300.0 L464.2,300.0 L467.3,300.0 L467.3,300.0 L470.4,300.0 L470.4,300.0 L473.5,300.0 L473.5,300.0 L476.6,300.0 L476.6,300.0 L479.7,300.0 L479.7,300.0 L482.8,300.0 L482.8,300.0 L485.9,300.0 L485.9,300.0 L489.0,300.0 L489.0,300.0 L492.0,300.0 L492.0,300.0 L495.1,300.0 L495.1,300.0 L498.2,300.0 L498.2,300.0 L501.3,300.0 L501.3,300.0 L504.4,300.0 L504.4,300.0 L507.5,300.0 L507.5,300.0 L510.6,300.0 L510.6,300.0 L513.7,300.0 L513.7,300.0 L560.2,300.0 L560.2,300.0 L606.7,300.0 L606.7,518.4 L653.1,518.4 L653.1,644.4 L699.6,644.4 L699.6,675.9 L746.1,675.9 L746.1,683.8 L792.5,683.8 L792.5,685.7 L839.0,685.7 L839.0,686.2 L885.5,686.2 L885.5,686.4 L931.9,686.4 L931.9,686.4 L978.4,686.4 L978.4,686.4 L1024.9,686.4 L1024.9,686.4 L1071.3,686.4 L1071.3,686.4 L1117.8,686.4 L1117.8,686.4 L1164.3,686.4 L1164.3,686.4 L1210.7,686.4 L1210.7,686.4 L1257.2,686.4 L1257.2,686.4 L1303.7,686.4 L1303.7,686.4 L1350.1,686.4 L1350.1,686.4 L1396.6,686.4 L1396.6,686.4 L1443.1,686.4 L1443.1,686.4 L1489.5,686.4 L1489.5,686.4 L1536.0,686.4 L1536.0,686.4" fill="none" stroke="#cf9440" stroke-width="3" stroke-linejoin="round"/>
+
+  <!-- annotations -->
+  <text x="281.4" y="664.4" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">calm: 0.80% base</text>
+  <circle cx="458.0" cy="300.0" r="6" fill="#cf9440"/>
+  <text x="479.9733333333333" y="334" text-anchor="start" font-family="IBM Plex Mono" font-size="19" font-weight="400" fill="#ece3d2">price runs → fee hits the 10% cap</text>
+  <text x="808.0222222222222" y="610.8" text-anchor="start" font-family="IBM Plex Mono" font-size="18" font-weight="400" fill="#8a7a5f">each quiet swap halves the surge</text>
+
+  <line x1="142" y1="720" x2="1536" y2="720" stroke="#463620"/>
+  <text x="142" y="754" text-anchor="start" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#5d5138">0</text>
+  <text x="839" y="754" text-anchor="middle" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#5d5138">time →   (about 15 minutes)</text>
+  <text x="1536" y="754" text-anchor="end" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#5d5138">15m</text>
+
+  <!-- the parameters that produced this curve -->
+  <text x="64" y="782" text-anchor="start" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#5d5138">standard hook · baseFactor 5000 · filterPeriod 10s · decayPeriod 600s · reductionFactor 50% · variableFeeControl 40000 · cap 10%</text>
+  <text x="64" y="808" text-anchor="start" font-family="IBM Plex Mono" font-size="17" font-weight="400" fill="#5d5138">base fee = baseFactor × tickSpacing, so 0.80% at the 160 spacing this curve uses</text>
+
+  <line x1="64" y1="826" x2="1536" y2="826" stroke="#2a2012"/>
+  <text x="64" y="864" text-anchor="start" font-family="IBM Plex Mono" font-size="22" font-weight="400" fill="#cf9440" letter-spacing="2">friar.fi</text>
+  <text x="1536" y="864" text-anchor="end" font-family="IBM Plex Mono" font-size="19" font-weight="400" fill="#5d5138">Robinhood Chain · 4663</text>
+</svg>

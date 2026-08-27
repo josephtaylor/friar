@@ -1,0 +1,14 @@
+{
+  // The Friar app (React SPA) served as a Workers static-assets deployment.
+  // Workers custom domains create their own DNS, so app.friar.fi provisions with
+  // the current wrangler token (Pages custom domains need zone DNS-edit, which the
+  // token lacks). Deploy with `npm run deploy web` (see DEPLOY.md); prod URLs come
+  // from apps/web/.env.production automatically — no VITE_* on the build command.
+  "name": "friar-web",
+  "compatibility_date": "2026-07-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [{ "pattern": "app.friar.fi", "custom_domain": true }]
+}

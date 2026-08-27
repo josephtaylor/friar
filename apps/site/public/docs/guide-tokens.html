@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Tokens board · Friar docs</title>
+<meta name="description" content="Friar docs: a step-by-step guide to opening, reading, and closing a position, plus how the contracts work and where your funds sit." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<meta name="theme-color" content="#100c07" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="The Tokens board · Friar docs" />
+<meta property="og:image" content="https://friar.fi/og.png?v=3" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="/docs/docs.css" />
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">FRIAR</a>
+  <nav class="top-links">
+    <a href="/docs/">docs</a>
+    <a href="https://discord.gg/wCjfVcq9C" target="_blank" rel="noreferrer">discord</a>
+    <a class="cta" href="https://app.friar.fi?ref=docs">launch app →</a>
+  </nav>
+</header>
+<div class="shell">
+  <aside class="side">
+    <div class="side-h">the docs</div>
+    <nav class="side-nav">
+        <a class="nav-item" href="/docs/">Overview</a>
+        <div class="side-sec">User guide</div>
+        <a class="nav-item" href="/docs/guide-start">Getting started</a>
+        <a class="nav-item active" href="/docs/guide-tokens">The Tokens board</a>
+        <a class="nav-item" href="/docs/guide-pools">The Friar Pools page</a>
+        <a class="nav-item" href="/docs/opening">Opening a position</a>
+        <a class="nav-item" href="/docs/guide-position">Your position page</a>
+        <a class="nav-item" href="/docs/guide-fees">Collecting fees</a>
+        <a class="nav-item" href="/docs/guide-close">Closing a position</a>
+        <a class="nav-item" href="/docs/guide-history">Positions & history</a>
+        <div class="side-sec">How it works</div>
+        <a class="nav-item" href="/docs/shapes">Positions & shapes</a>
+        <a class="nav-item" href="/docs/fees">How the fee is set</a>
+        <a class="nav-item" href="/docs/costs">What Friar charges</a>
+        <a class="nav-item" href="/docs/anatomy">Where your money sits</a>
+        <a class="nav-item" href="/docs/range">When it goes wrong</a>
+    </nav>
+  </aside>
+  <main class="doc">
+    <h1>The Tokens board</h1>
+<p>The Tokens board is the app&#39;s front door. It lists what&#39;s actually trading on Robinhood Chain
+and, for each token, how much fee income the incumbent venue&#39;s liquidity is earning.</p>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-tokens.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-tokens.png" decoding="async" width="1511" height="790" alt="The Friar Tokens board: a table of tokens ranked by 24h volume, with columns for market cap, price change, volume, liquidity, fee over TVL, and the incumbent venue's fee tier, plus an Open button on each row." /></a></div>
+  <figcaption>Ranked by 24h volume by default. Every column header sorts, and clicking
+  anywhere on a row takes you to the open screen with that token filled in.</figcaption>
+</figure><h2 id="reading-the-columns">Reading the columns</h2>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Column</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>MCAP</strong></td>
+<td>market cap, from Dexscreener</td>
+</tr>
+<tr>
+<td><strong>24H</strong></td>
+<td>price change over the selected window</td>
+</tr>
+<tr>
+<td><strong>VOL 24H</strong></td>
+<td>traded volume over the window. This is the raw material — no volume, no fees</td>
+</tr>
+<tr>
+<td><strong>LIQ</strong></td>
+<td>liquidity sitting in the incumbent venue</td>
+</tr>
+<tr>
+<td><strong>FEE/TVL</strong></td>
+<td>volume × the incumbent&#39;s fee ÷ liquidity. <strong>The one to look at</strong></td>
+</tr>
+<tr>
+<td><strong>INCUMBENT FEE</strong></td>
+<td>the fee tier of the venue that currently has the highest flow</td>
+</tr>
+</tbody></table></div>
+<p><strong>FEE/TVL is the column that matters.</strong> It&#39;s what LPs at the existing venue actually earned per
+dollar of liquidity over the window — the fee side of the return, before any inventory risk.
+A token showing 99% is paying its LPs roughly a percent of TVL per day in fees. That is the
+opportunity; it is not the outcome, because it says nothing about what the token&#39;s price did
+to the inventory those LPs are holding. See <a href="/docs/range">when price leaves your
+range</a> for the other half of that.</p>
+<p>When the incumbent&#39;s fee can&#39;t be resolved, FEE/TVL falls back to plain turnover — <code>3.2×</code>
+means volume ran 3.2 times the liquidity, which is the same signal without the fee multiplier.</p>
+<p><strong>INCUMBENT FEE</strong> is what the dominant venue charges, and it is the multiplier behind
+FEE/TVL. It is not a prediction about volume. A cheaper fee does not pull flow across on its
+own: routers price the whole trade, so depth at the touch decides where an order goes and the
+fee differential is a rounding error next to it. Read this column as the input to the yield
+above, not as a reason the flow would move.</p>
+<h2 id="filters">Filters</h2>
+<ul>
+<li><strong>All / Memes / Stocks</strong> splits the board by kind. Stocks are the official Robinhood
+stock tokens, which quote in <strong>USDG</strong> rather than WETH.</li>
+<li><strong>1h / 6h / 24h</strong> changes the window that the change, volume and FEE/TVL columns describe.
+A 1h FEE/TVL is much noisier and much more current than a 24h one.</li>
+<li><strong>search</strong> matches symbol, name or address.</li>
+</ul>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-tokens-stocks.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-tokens-stocks.png" decoding="async" width="1568" height="637" alt="The Tokens board filtered to Stocks, showing NVDA, SPCX, GME, TSLA, RDDT, RBLX, AAPL and MSFT, most quoted in USDG, each with a green verified badge." /></a></div>
+  <figcaption>The Stocks filter. These come from the official stock-token registry, which is
+  why they carry a badge — it means the token is the registry's, not that the trade is
+  safe.</figcaption>
+</figure><h2 id="safety-marks">Safety marks</h2>
+<p>Two different things happen, and it&#39;s worth knowing which is which.</p>
+<p><strong>Tokens flagged as honeypot, can&#39;t-sell or ruggable never reach the board at all.</strong> They&#39;re
+dropped from the listing and refused by the open flow. So are pools whose hook holds permission
+to run on liquidity <strong>removal</strong> — a hook that can run on the way out can block or tax your
+exit, and no fee is worth that.</p>
+<p><strong>A ⚠ next to the pair</strong> is the softer case: the token is mintable, pausable, has a blacklist
+function, or sits behind a proxy. It isn&#39;t blocked and it isn&#39;t a verdict. Hover it for the
+list. It means know what you&#39;re LPing.</p>
+<p>Neither check is a guarantee. Screeners are wrong in both directions, and token selection is
+still the thing that dominates your outcome.</p>
+<h2 id="getting-to-the-open-screen">Getting to the open screen</h2>
+<p>Click a row, or its <strong>Open</strong> button. Both land on the <a href="/docs/opening">open screen</a> with the
+token and its quote already filled in.</p>
+<p>Some rows on this board have <strong>no Friar pool yet</strong>. That&#39;s not a problem — opening a position
+on a token with no Friar pool creates the pool at market price as part of the same transaction,
+and you&#39;re its first LP. The open screen tells you which case you&#39;re in before you sign.</p>
+<p>You aren&#39;t limited to this list either. The open screen takes a pasted token address, v4 pool
+id, v3 pair address or Dexscreener link, so any safe pool on the chain works — including v4
+pools that aren&#39;t Friar&#39;s.</p>
+
+    <div class="pagers">
+      <a class="pager prev" href="/docs/guide-start"><span>previous</span>Getting started</a>
+      <a class="pager next" href="/docs/guide-pools"><span>next</span>The Friar Pools page</a>
+    </div>
+    <footer>
+      friar.fi · an independent project on Robinhood Chain, not affiliated with or endorsed
+      by Robinhood · nothing here is financial advice
+    </footer>
+  </main>
+</div>
+<script src="/beacon.js" defer></script>
+</body>
+</html>

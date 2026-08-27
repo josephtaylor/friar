@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Getting started · Friar docs</title>
+<meta name="description" content="Friar docs: a step-by-step guide to opening, reading, and closing a position, plus how the contracts work and where your funds sit." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+<meta name="theme-color" content="#100c07" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Getting started · Friar docs" />
+<meta property="og:image" content="https://friar.fi/og.png?v=3" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="/docs/docs.css" />
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">FRIAR</a>
+  <nav class="top-links">
+    <a href="/docs/">docs</a>
+    <a href="https://discord.gg/wCjfVcq9C" target="_blank" rel="noreferrer">discord</a>
+    <a class="cta" href="https://app.friar.fi?ref=docs">launch app →</a>
+  </nav>
+</header>
+<div class="shell">
+  <aside class="side">
+    <div class="side-h">the docs</div>
+    <nav class="side-nav">
+        <a class="nav-item" href="/docs/">Overview</a>
+        <div class="side-sec">User guide</div>
+        <a class="nav-item active" href="/docs/guide-start">Getting started</a>
+        <a class="nav-item" href="/docs/guide-tokens">The Tokens board</a>
+        <a class="nav-item" href="/docs/guide-pools">The Friar Pools page</a>
+        <a class="nav-item" href="/docs/opening">Opening a position</a>
+        <a class="nav-item" href="/docs/guide-position">Your position page</a>
+        <a class="nav-item" href="/docs/guide-fees">Collecting fees</a>
+        <a class="nav-item" href="/docs/guide-close">Closing a position</a>
+        <a class="nav-item" href="/docs/guide-history">Positions & history</a>
+        <div class="side-sec">How it works</div>
+        <a class="nav-item" href="/docs/shapes">Positions & shapes</a>
+        <a class="nav-item" href="/docs/fees">How the fee is set</a>
+        <a class="nav-item" href="/docs/costs">What Friar charges</a>
+        <a class="nav-item" href="/docs/anatomy">Where your money sits</a>
+        <a class="nav-item" href="/docs/range">When it goes wrong</a>
+    </nav>
+  </aside>
+  <main class="doc">
+    <h1>Getting started</h1>
+<p>Everything you need before you open anything, and a tour of the four screens the app has.</p>
+<h2 id="what-you-need">What you need</h2>
+<ul>
+<li><strong>A wallet on Robinhood Chain</strong>, chain id 4663. Any EVM wallet works. The app will offer to
+add or switch the network for you.</li>
+<li><strong>ETH for gas.</strong> Cents, but you need some, and it has to be ETH <em>on chain 4663</em> — a wallet
+that arrived holding only WETH can&#39;t pay for the approve.</li>
+<li><strong>The quote token, or ETH to wrap into it.</strong> Most pools are quoted in WETH; the stock tokens
+are quoted in USDG. If you hold native ETH and the pool wants WETH, the app wraps it as part
+of the flow. You don&#39;t need to go and do that somewhere else first.</li>
+</ul>
+<p>There&#39;s no allowlist, no signup, and no deposit cap. Connect and go.</p>
+<h2 id="connecting">Connecting</h2>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-connect.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-connect.png" decoding="async" width="1568" height="265" alt="The Friar top bar with a connect button on the right, and a screen reading 'connect a wallet to see your history' above a Connect wallet button." /></a></div>
+  <figcaption>Walletless visitors land on Tokens, which is fully browsable. Positions and
+  History need a wallet, because they're keyed to your address.</figcaption>
+</figure><p>You can look around the whole app without connecting — the Tokens board and the entire open
+screen, including the live bin preview, work with no wallet attached. Only the submit button
+and your own book need one.</p>
+<h2 id="the-screens">The screens</h2>
+<figure>
+  <div class="frame shot"><a class="zoom" href="/docs/img/ui-nav.png" target="_blank" rel="noreferrer" title="open full size"><img src="/docs/img/ui-nav.png" decoding="async" width="1562" height="77" alt="The Friar top bar: the FRIAR wordmark, then Tokens, Positions and History tabs, then a Discord link, an ETH/USD denomination toggle, an Open position button, and the connected wallet chip." /></a></div>
+  <figcaption>The top bar is the whole navigation. It's the same on every screen.</figcaption>
+</figure><div class="tbl"><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong><a href="/docs/guide-tokens">Tokens</a></strong></td>
+<td>what&#39;s trading on the chain, and where the fees are. Where you go to find something to LP</td>
+</tr>
+<tr>
+<td><strong><a href="/docs/guide-history">Positions</a></strong></td>
+<td>your open positions, with portfolio value and the PnL split across all of them</td>
+</tr>
+<tr>
+<td><strong><a href="/docs/guide-history">History</a></strong></td>
+<td>closed positions, realized PnL frozen at close, and a CSV export</td>
+</tr>
+<tr>
+<td><strong>+ Open position</strong></td>
+<td>the <a href="/docs/opening">creation screen</a>. Also reachable by clicking any row on the Tokens board</td>
+</tr>
+</tbody></table></div>
+<p>Two controls sit next to them and are easy to miss:</p>
+<ul>
+<li><strong>Ξ / $</strong> switches every number in the app between ETH and USD. It&#39;s purely a display
+choice — the pools quote in WETH either way, and the USD view is that number times a rate.
+Your choice is remembered.</li>
+<li><strong>Discord</strong> is the community. Come and join it — ask questions, see what other people are
+LPing, and tell us what the app should do next.</li>
+</ul>
+<h2 id="viewing-without-connecting">Viewing without connecting</h2>
+<p>Every read in the app is keyed by address and served from a public ledger, so any book can be
+opened read-only by putting the address in the URL:</p>
+<pre><code>https://app.friar.fi/?address=0xYourAddressHere
+</code></pre>
+<p>That works for the dashboard, the history, and individual positions. It&#39;s how you&#39;d share a
+position with someone, or check a book from a device you&#39;d rather not connect a wallet on.
+It&#39;s read-only in the real sense — the action buttons don&#39;t render, because signing needs the
+owner&#39;s wallet.</p>
+<h2 id="before-you-put-money-in">Before you put money in</h2>
+<p>The manager contract <strong>hasn&#39;t been audited</strong>, and it&#39;s immutable — there&#39;s no pause and no
+rescue if there&#39;s a bug in it. That cuts both ways: nobody can rug you with an admin key, and
+nobody can save you either. <a href="/docs/anatomy">Where your money sits</a> is the page that walks
+through exactly what each contract can and can&#39;t do, and how to verify it on the explorer.</p>
+<p>Then start with <a href="/docs/guide-tokens">the Tokens board</a>.</p>
+
+    <div class="pagers">
+      <a class="pager prev" href="/docs/"><span>previous</span>Overview</a>
+      <a class="pager next" href="/docs/guide-tokens"><span>next</span>The Tokens board</a>
+    </div>
+    <footer>
+      friar.fi · an independent project on Robinhood Chain, not affiliated with or endorsed
+      by Robinhood · nothing here is financial advice
+    </footer>
+  </main>
+</div>
+<script src="/beacon.js" defer></script>
+</body>
+</html>
