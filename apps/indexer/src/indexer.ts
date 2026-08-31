@@ -29,7 +29,11 @@ import type { Env } from "./worker.js";
 // answering "Too Many Requests"; 60s once Alchemy PAYG became the primary endpoint.)
 // The one moment a slow poll would be felt — "did my open land?" — is covered by the web
 // app's eager ingest-by-tx-hash, which never waits for the poll.
-const POLL_MS = 60_000;
+// Poll cadence. Nothing consumes this in real time any more: the app is a public example
+// with no open positions, so freshness is worth far less than staying inside a free RPC
+// tier. eth_getLogs is range-based, so a slower poll loses no data, it only adds latency.
+// Was 60_000, which cost ~1,440 polls/day and ran the keyed endpoint into its limit.
+const POLL_MS = 900_000; // 15 min -> ~96 polls/day
 const MAX_RANGE = 2_000n; // getLogs page size — bounds backfill iterations
 const CONFIRMATIONS = 5n;
 
@@ -204,7 +208,7 @@ export class ChainIndexer extends DurableObject<Env> {
     // local dev, so the loop has to own this. Failures go to the ring only.
     try {
       const lastSnap = (await this.ctx.storage.get<number>("lastSnapshotMs")) ?? 0;
-      if (Date.now() - lastSnap > 300_000) {
+      if (Date.now() - lastSnap > 1_800_000) { // 30 min (was 5)
         await runSnapshots(this.env);
         await this.ctx.storage.put("lastSnapshotMs", Date.now());
       }

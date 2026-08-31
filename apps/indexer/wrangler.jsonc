@@ -20,7 +20,7 @@
     }
   ],
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    "crons": ["0 * * * *"]
   },
   "vars": {
     // Comma-separated FALLBACK LIST, tried in order — see src/rpc.ts for why and for the
