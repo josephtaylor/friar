@@ -12,6 +12,7 @@
 // identify one. Cleared with localStorage.
 
 import { getAccount } from "wagmi/actions";
+import { describeConnector, type ConnectorLike } from "./wallet.js";
 import { config } from "./wagmi.js";
 
 // Same convention as api.ts / errors.tsx — VITE_API_URL, localhost in dev. Getting this
@@ -98,11 +99,17 @@ export function track(name: EventName, meta?: Record<string, unknown>): void {
 }
 
 /** Wallet connections, tracked once per address per tab (wagmi re-emits on reconnect and
- * chain change, which would otherwise read as a fresh conversion every time). */
+ * chain change, which would otherwise read as a fresh conversion every time).
+ *
+ * `meta` carries the CONNECTOR (2026-09-03). Every wallet_connect row before that date has
+ * meta NULL, so when an open failed with three signed approvals that never reached the
+ * chain there was no way to tell which wallet had produced them — and "was that Phantom?"
+ * is the first question anyone asks about a broken send on this chain. One field, and the
+ * next visitor answers it. Wallet name only: this table holds no PII by design. */
 const seenWallets = new Set<string>();
-export function trackWalletConnect(address: string): void {
+export function trackWalletConnect(address: string, connector?: ConnectorLike): void {
   const a = address.toLowerCase();
   if (seenWallets.has(a)) return;
   seenWallets.add(a);
-  track("wallet_connect");
+  track("wallet_connect", describeConnector(connector));
 }

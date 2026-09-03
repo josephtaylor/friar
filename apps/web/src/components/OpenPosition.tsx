@@ -41,6 +41,7 @@ import { useTokenSymbol } from "../tokens.js";
 import { track } from "../analytics.js";
 import { DOCS_OPENING } from "../links.js";
 import { humanErr, report } from "../errors.js";
+import { explainTimeout } from "../txprobe.js";
 
 const FPM = ADDRESSES.positionManager as Address;
 const MAX_UINT256 = (1n << 256n) - 1n; // one-time (unlimited) allowance
@@ -1190,8 +1191,12 @@ export function TxStepper({
         setStatuses((s) => s.map((v, j) => (j === i ? "done" : v)));
       } catch (e) {
         setStatuses((s) => s.map((v, j) => (j === i ? "failed" : v)));
-        report(`${title} — ${steps[i]!.label}`, e, hash ? { txHash: hash } : {});
-        setErr(humanErr(e));
+        // A receipt-wait timeout is ambiguous on its own — slow, or never broadcast at all.
+        // Resolve it before reporting so the operator's action name and the user's advice
+        // both say which, instead of "timed out" three times in a row (see txprobe.ts).
+        const verdict = await explainTimeout(e, hash);
+        report(`${title} — ${steps[i]!.label}${verdict?.action ? ` [${verdict.action}]` : ""}`, e, hash ? { txHash: hash } : {});
+        setErr(verdict?.message ?? humanErr(e));
         running.current = false;
         return;
       }

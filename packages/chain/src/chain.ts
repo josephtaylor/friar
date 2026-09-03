@@ -5,7 +5,19 @@ export const robinhoodChain = defineChain({
   name: "Robinhood Chain",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: ["https://rpc.mainnet.chain.robinhood.com"] },
+    // FALLBACK LIST, tried in order, same ordering and reasoning as the indexer's
+    // RPC_URL var: publicnode answers eth_call and multicall happily, while the official
+    // sequencer endpoint rate-limits hard (it 429s the indexer Worker, and on 2026-09-03
+    // it threw "Failed to fetch" on a visitor's getSlot0 mid-open). The official one stays
+    // as the second entry because it is the only keyless endpoint without an eth_getLogs
+    // range cap. Consumers MUST wire these through viem's `fallback()` to get the failover
+    // — `http()` with no argument only ever reads http[0].
+    //
+    // Order matters beyond our own reads: wagmi's injected connector hands this array to
+    // `wallet_addEthereumChain`, so http[0] is the endpoint a visitor's wallet registers
+    // for chain 4663 and then uses to simulate and broadcast. A dead http[0] is a wallet
+    // that silently fails to relay signed transactions.
+    default: { http: ["https://robinhood-rpc.publicnode.com", "https://rpc.mainnet.chain.robinhood.com"] },
   },
   blockExplorers: {
     default: { name: "Blockscout", url: "https://explorer.mainnet.chain.robinhood.com" },

@@ -1,6 +1,6 @@
 // Client-side pool resolution + open planning. Pure math from @friar/core; chain
 // reads via viem against the live RPC (no indexer dependency for planning).
-import { createPublicClient, http, erc20Abi, parseAbiItem, type Address, type Hex } from "viem";
+import { createPublicClient, fallback, http, erc20Abi, parseAbiItem, type Address, type Hex } from "viem";
 import {
   robinhoodChain,
   ADDRESSES,
@@ -29,7 +29,12 @@ import {
   type PlannedBin,
 } from "@friar/core";
 
-export const publicClient = createPublicClient({ chain: robinhoodChain, transport: http() });
+// fallback() so a 429/outage on one endpoint rolls over instead of failing the read. See
+// the rpcUrls comment in @friar/chain: bare http() would pin every call to http[0].
+export const publicClient = createPublicClient({
+  chain: robinhoodChain,
+  transport: fallback(robinhoodChain.rpcUrls.default.http.map((url) => http(url))),
+});
 
 export const E18 = 10n ** 18n;
 

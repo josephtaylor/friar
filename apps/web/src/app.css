@@ -1725,3 +1725,20 @@ button {
 .cal-pnl { font-family: "IBM Plex Mono", monospace; font-size: 11px; }
 .cal-amt { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--dim); }
 @media (max-width: 720px) { .cal-cell { min-height: 54px; padding: 4px 5px; } .cal-pnl { font-size: 9px; } .cal-amt { font-size: 8px; } }
+
+/* Post-connect Phantom warning (see PhantomWarning in App.tsx). Loud on purpose: the
+   failure it prevents is a signed approval that silently never reaches the sequencer, and
+   the user's only other feedback is a "timed out" they cannot act on. */
+.phantom-warn {
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.phantom-warn strong {
+  color: var(--accent);
+}

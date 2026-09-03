@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useAccount, useDisconnect } from "wagmi";
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { Shell, type NavKey } from "./components/Shell.js";
@@ -13,6 +13,7 @@ import { StepperProvider } from "./components/StepperHost.js";
 import { shortAddr } from "./tokens.js";
 import { useAccess } from "./access.js";
 import { track, trackWalletConnect } from "./analytics.js";
+import { connectorIsPhantom } from "./wallet.js";
 
 /** Where a screen was entered from, so its crumb can name the way back. Carried in the URL
  * (?from=) rather than in state because a screen is also reachable by a shared link or a
@@ -62,7 +63,7 @@ function useBack(from: From) {
 }
 
 export function App() {
-  const { address: connectedAddress } = useAccount();
+  const { address: connectedAddress, connector } = useAccount();
   const { disconnect } = useDisconnect();
   const location = useLocation();
   const [sp] = useSearchParams();
@@ -86,8 +87,8 @@ export function App() {
     track("page_view");
   }, [location.pathname]);
   useEffect(() => {
-    if (connectedAddress) trackWalletConnect(connectedAddress);
-  }, [connectedAddress]);
+    if (connectedAddress) trackWalletConnect(connectedAddress, connector);
+  }, [connectedAddress, connector]);
 
   // read-only viewer: ?address=0x… shows any wallet's book. Open to anyone — it can only
   // ever render public-ledger data the API already serves to every caller.
@@ -142,6 +143,43 @@ export function App() {
   );
 }
 
+/** The half of the Phantom block that the wallet chooser cannot do (2026-09-03).
+ *
+ * Gate.tsx greys out the Phantom BUTTON, which only helps someone who connects through
+ * that door on that render. It does nothing for a session persisted from before the block
+ * shipped, and nothing for a provider that declines to call itself Phantom — Phantom
+ * injecting as the generic window.ethereum, or its mobile in-app browser, which is how the
+ * only outside position this app has ever had was opened. So ask the live provider, which
+ * sets `isPhantom` on itself whatever name it announced, and say so plainly instead of
+ * letting someone sign approvals that their wallet will never relay.
+ *
+ * A warning, not a forced disconnect: wagmi reconnects on its own, so disconnecting here
+ * fights the reconnect and loops. Delete with the rest of the Phantom handling. */
+function PhantomWarning() {
+  const { connector, isConnected } = useAccount();
+  const [flagged, setFlagged] = useState(false);
+  useEffect(() => {
+    let live = true;
+    if (!isConnected) {
+      setFlagged(false);
+      return;
+    }
+    void connectorIsPhantom(connector).then((v) => live && setFlagged(v));
+    return () => {
+      live = false;
+    };
+  }, [connector, isConnected]);
+  if (!flagged) return null;
+  return (
+    <div className="phantom-warn">
+      <strong>Phantom can't transact on Robinhood Chain yet.</strong> It fails simulation on valid
+      transactions here, so an approval can look signed and never reach the network. We've reported it
+      to Phantom. Trust, MetaMask and Rabby all work, or open app.friar.fi inside another wallet's
+      browser.
+    </div>
+  );
+}
+
 /** Shared chrome around the routed screens; nav buttons keep the preserved params.
  * brandTo: the wordmark lands walletless visitors on Tokens, not an empty Positions. */
 function ShellLayout({ active, wallet, brandTo }: { active: NavKey | "none"; wallet: ReactNode; brandTo: string }) {
@@ -155,6 +193,7 @@ function ShellLayout({ active, wallet, brandTo }: { active: NavKey | "none"; wal
       onOpen={() => go(`/open?from=${active === "none" ? "positions" : active}`)}
       wallet={wallet}
     >
+      <PhantomWarning />
       <Outlet />
     </Shell>
   );

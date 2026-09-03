@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAccount, useConnect } from "wagmi";
+import { isPhantomBrowser, isPhantomConnector } from "../wallet.js";
 
 /** Wallet-connection UI. This file used to hold the invite-only beta's gates
  * (BetaBanner / OpenGate / PrivateGate); the beta ended 2026-07-25 and they're gone —
@@ -11,8 +12,13 @@ import { useAccount, useConnect } from "wagmi";
  * warning and, past that, its transaction simulation fails valid sends outright.
  * Reported to Phantom; until it's fixed, letting a Phantom user connect just walks them
  * into a scare screen mid-open. Remove this (and the modal note below) when Phantom's
- * chain support works. */
-const isPhantom = (c: { id: string; name: string }) => c.id === "app.phantom" || /phantom/i.test(c.name);
+ * chain support works.
+ *
+ * The predicate moved to ../wallet.js on 2026-09-03 and grew rdns + ua matching: this
+ * chooser is only ONE of the ways in, and the name test alone missed both Phantom's mobile
+ * in-app browser and Phantom injecting as the generic window.ethereum. PhantomWarning in
+ * App.tsx is the other half — it catches a connection this door never saw. */
+const isPhantom = isPhantomConnector;
 
 /** The wallet chooser — one entry per detected wallet (EIP-6963 discovery). Always
  * reached through a single connect button + this modal, everywhere in the app. */
@@ -42,7 +48,7 @@ function WalletModal({ onClose }: { onClose: () => void }) {
             )}
           </div>
         )}
-        {connectors.some(isPhantom) && (
+        {(connectors.some(isPhantom) || isPhantomBrowser()) && (
           <div className="gate-note">
             Phantom's Robinhood Chain support is incomplete right now: it blocks valid transactions
             on this chain. We've reported it to Phantom. Meanwhile Trust, MetaMask, and Rabby all
