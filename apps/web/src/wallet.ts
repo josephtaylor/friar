@@ -1,10 +1,21 @@
 // Wallet identification, in one place because two different screens need the same
 // answer and got it differently before.
 //
-// Phantom is unusable on Robinhood Chain (2026-08-02): its security backend can't read
-// chain 4663, so it renders the verified manager as "an EOA" behind a red full-screen
-// warning, and its transaction simulation fails valid sends outright. Reported to
-// Phantom; until it's fixed a Phantom user cannot complete an open no matter what we do.
+// Phantom does not support connecting to apps on Robinhood Chain. That is Phantom's own
+// documented limit, not a bug we found: their Robinhood Chain FAQ says "dApp connectivity
+// is not currently available", and their connect-to-apps page still lists chain 4663
+// alongside Bitcoin as a network you cannot connect to apps on (checked 2026-09-05).
+// Phantom DID add Robinhood Chain on 2026-07-23, which is what people have heard, but what
+// shipped is wallet-side balances / send / receive / swap / bridge. Signing a contract call
+// from a website is not in it, which is the cleanest explanation for the 2026-09-03 open
+// whose three signed approvals never reached the sequencer.
+//
+// EXCEPT the mobile in-app browser, which is allowed through (2026-09-05). Phantom's own
+// browser injects a provider that works in practice: the only outside position this app has
+// ever had was opened AND closed through it on 2026-08-02, both transactions on chain. It
+// is the one Phantom path with evidence behind it, and a Solana-native user arriving on
+// their phone is exactly who shows up here, so blocking it costs more than it protects.
+// The desktop extension stays blocked; both paths get warned.
 //
 // The original check lived in Gate.tsx and matched the connector NAME only, in the wallet
 // chooser only. That left three ways in, all of which a real visitor can walk through:
@@ -20,7 +31,8 @@
 //      the name test cannot see at all.
 //
 // So: match on every sync signal here, and on the provider's own `isPhantom` flag once
-// there is a live connection. Delete this whole file when Phantom's chain support works.
+// there is a live connection. Delete this whole file when Phantom ships dapp connectivity
+// for 4663.
 
 /** Shape shared by wagmi's Connector and the chooser's view of one. */
 export interface ConnectorLike {
@@ -51,6 +63,14 @@ export function isPhantomConnector(c: ConnectorLike): boolean {
     /phantom/i.test(c.name) ||
     /phantom/i.test(c.id)
   );
+}
+
+/** Whether to refuse this connector in the wallet chooser. Phantom's extension cannot sign
+ * for a website on this chain, so offering it is offering a dead end. Inside Phantom's own
+ * mobile browser the same predicate matches but the path demonstrably works, so it is let
+ * through and warned instead of blocked. */
+export function isPhantomBlocked(c: ConnectorLike): boolean {
+  return isPhantomConnector(c) && !isPhantomBrowser();
 }
 
 /** The authoritative check, once connected: Phantom's EVM provider sets `isPhantom` on

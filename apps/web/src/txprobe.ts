@@ -56,13 +56,13 @@ export async function explainTimeout(
 ): Promise<{ message: string; action?: string } | null> {
   if (!hash || !isTimeout(e)) return null;
   const where = await locateTx(hash);
-  if (where === "mined") return { message: "the transaction did confirm — reload to pick it up", action: "tx-late" };
+  if (where === "mined") return { message: "the transaction did confirm. Reload to pick it up", action: "tx-late" };
   if (where === "pending")
-    return { message: "still pending on the network — give it a moment rather than re-signing", action: "tx-pending" };
-  if (where === "unknown") return { message: "couldn't reach the network to check — try again in a minute" };
+    return { message: "still pending on the network, so give it a moment rather than re-signing", action: "tx-pending" };
+  if (where === "unknown") return { message: "couldn't reach the network to check. Try again in a minute" };
   return {
     message:
-      "your wallet reported this as sent, but the network never received it. Re-signing won't help. This is usually a bad RPC endpoint for Robinhood Chain in the wallet's own network settings, and Phantom does it on every send.",
+      "your wallet reported this as sent, but the network never received it. Re-signing won't help. This is usually the wallet's own RPC endpoint for Robinhood Chain, or a wallet that doesn't support signing for apps on this chain at all.",
     action: "tx-vanished",
   };
 }

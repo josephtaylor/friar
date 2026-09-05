@@ -1,24 +1,19 @@
 import { useState } from "react";
 import { useAccount, useConnect } from "wagmi";
-import { isPhantomBrowser, isPhantomConnector } from "../wallet.js";
+import { isPhantomBrowser, isPhantomConnector, isPhantomBlocked } from "../wallet.js";
 
 /** Wallet-connection UI. This file used to hold the invite-only beta's gates
  * (BetaBanner / OpenGate / PrivateGate); the beta ended 2026-07-25 and they're gone —
  * nothing here refuses anyone now. What's left is the connect affordance and the
  * walletless empty state. */
 
-/** Phantom is blocked at the door (2026-08-02): its security backend can't read
- * Robinhood Chain, so it flags the verified manager as "an EOA" with a red full-screen
- * warning and, past that, its transaction simulation fails valid sends outright.
- * Reported to Phantom; until it's fixed, letting a Phantom user connect just walks them
- * into a scare screen mid-open. Remove this (and the modal note below) when Phantom's
- * chain support works.
- *
- * The predicate moved to ../wallet.js on 2026-09-03 and grew rdns + ua matching: this
- * chooser is only ONE of the ways in, and the name test alone missed both Phantom's mobile
- * in-app browser and Phantom injecting as the generic window.ethereum. PhantomWarning in
- * App.tsx is the other half — it catches a connection this door never saw. */
-const isPhantom = isPhantomConnector;
+/** Phantom's desktop extension is blocked at the door (2026-08-02): Phantom does not
+ * support connecting to apps on Robinhood Chain at all, so a Phantom user who connects
+ * walks into a scare screen and then signs approvals their wallet never relays. See
+ * ../wallet.js for the citation and for why Phantom's mobile in-app browser is the one
+ * exception that IS let through. PhantomWarning in App.tsx is the other half of this: it
+ * catches a connection that never came through this door. */
+const isPhantom = isPhantomBlocked;
 
 /** The wallet chooser — one entry per detected wallet (EIP-6963 discovery). Always
  * reached through a single connect button + this modal, everywhere in the app. */
@@ -48,12 +43,21 @@ function WalletModal({ onClose }: { onClose: () => void }) {
             )}
           </div>
         )}
-        {(connectors.some(isPhantom) || isPhantomBrowser()) && (
+        {isPhantomBrowser() ? (
           <div className="gate-note">
-            Phantom's Robinhood Chain support is incomplete right now: it blocks valid transactions
-            on this chain. We've reported it to Phantom. Meanwhile Trust, MetaMask, and Rabby all
-            work, or open app.friar.fi inside another wallet's browser.
+            Heads up: Phantom doesn't officially support connecting to apps on Robinhood Chain, so
+            some transactions can be signed and never confirm. Its mobile browser does usually work
+            here, and you can carry on. If something stalls, that's why.
           </div>
+        ) : (
+          connectors.some(isPhantomConnector) && (
+            <div className="gate-note">
+              Phantom doesn't support connecting to apps on Robinhood Chain. That's Phantom's own
+              documented limit, not a Friar one: transactions get signed and then never reach the
+              network. Trust, MetaMask, and Rabby all work here, or open app.friar.fi inside
+              Phantom's mobile browser, which does.
+            </div>
+          )
         )}
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>

@@ -13,7 +13,7 @@ import { StepperProvider } from "./components/StepperHost.js";
 import { shortAddr } from "./tokens.js";
 import { useAccess } from "./access.js";
 import { track, trackWalletConnect } from "./analytics.js";
-import { connectorIsPhantom } from "./wallet.js";
+import { connectorIsPhantom, isPhantomBrowser } from "./wallet.js";
 
 /** Where a screen was entered from, so its crumb can name the way back. Carried in the URL
  * (?from=) rather than in state because a screen is also reachable by a shared link or a
@@ -170,12 +170,26 @@ function PhantomWarning() {
     };
   }, [connector, isConnected]);
   if (!flagged) return null;
+  // Two audiences, two messages. In Phantom's mobile browser the user is allowed to carry
+  // on (it works in practice), so the note prepares them for a stall rather than sending
+  // them away. On the extension there is nothing to do but switch wallets.
   return (
     <div className="phantom-warn">
-      <strong>Phantom can't transact on Robinhood Chain yet.</strong> It fails simulation on valid
-      transactions here, so an approval can look signed and never reach the network. We've reported it
-      to Phantom. Trust, MetaMask and Rabby all work, or open app.friar.fi inside another wallet's
-      browser.
+      {isPhantomBrowser() ? (
+        <>
+          <strong>You're in Phantom's browser.</strong> Phantom doesn't officially support connecting
+          to apps on Robinhood Chain, so a transaction can occasionally be signed and never confirm.
+          This usually works anyway, so carry on. If something stalls, that's the reason, and Trust,
+          MetaMask or Rabby will get you through.
+        </>
+      ) : (
+        <>
+          <strong>Phantom can't sign for apps on Robinhood Chain.</strong> That's Phantom's own
+          documented limit, not a Friar one: a transaction gets signed and then never reaches the
+          network. Trust, MetaMask and Rabby all work here, or open app.friar.fi inside Phantom's
+          mobile browser.
+        </>
+      )}
     </div>
   );
 }
